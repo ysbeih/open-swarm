@@ -10,4 +10,5 @@ __pycache__/
 .env*
 config/local.json
 config/peer-*.json
+config/local.json.bak
 .DS_Store
