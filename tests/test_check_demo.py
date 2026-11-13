@@ -9,8 +9,11 @@ All tests are clearly separate from physical cluster observations.
 
 from __future__ import annotations
 
+from copy import deepcopy
+import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -18,6 +21,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
+import check_demo
 from check_demo import (
     EXIT_BLOCKED,
     EXIT_BUSY,
@@ -98,6 +102,8 @@ def make_state(
                 "sharing": sharing,
                 "state": local_state,
                 "session": session,
+                "runtime": runtime,
+                "setup_issues": setup_issues or [],
                 "error": None,
             },
             {
@@ -107,6 +113,7 @@ def make_state(
                 "sharing": peer_b_sharing,
                 "state": peer_b_state,
                 "session": peer_b_session,
+                "runtime": {**RUNTIME_READY, "role": "worker"},
                 "error": None if peer_b_online else "connection refused",
             },
         ],
@@ -286,6 +293,7 @@ def test_remote_snapshot_updates_peer_state():
     remote_b = {
         "id": "b", "name": "M3 Pro", "online": True, "sharing": True,
         "state": "worker_ready", "session": SESSION, "error": None,
+        "runtime": {**RUNTIME_READY, "role": "worker"},
     }
     status, blockers, detail = analyse(state, [remote_b])
     assert status == STATUS_READY
@@ -328,8 +336,8 @@ def test_format_report_basic():
     assert "READY" in report
     assert "peer_id" not in report  # internal key, not label
     assert "M4 Pro" in report or "M3 Pro" in report
-    # Must not contain anything that looks like our test session id
-    assert "token" not in report.lower()
+    assert "graphs=42" in report
+    assert "submissions, not tokens" in report
 
 
 def test_format_report_shows_blockers():
@@ -339,3 +347,124 @@ def test_format_report_shows_blockers():
     report = format_report(status, blockers, detail)
     assert "Blockers" in report
     assert "unreachable" in report.lower()
+
+
+def worker_view():
+    state = deepcopy(make_state())
+    state['local'] = deepcopy(state['peers'][1])
+    state['local']['setup_issues'] = [
+        'Model file missing on this laptop; it can contribute after setup, but cannot coordinate yet.',
+        'Set one coordinator device per peer after running device discovery.',
+        'The llama-server executable is missing.',
+    ]
+    state['peers'][1] = deepcopy(state['local'])
+    state['model']['present'] = False
+    return state
+
+
+def test_healthy_worker_does_not_need_coordinator_files():
+    status, blockers, _ = analyse(worker_view(), [])
+    assert status == STATUS_READY
+    assert blockers == []
+
+
+def test_idle_workers_do_not_need_coordinator_files():
+    state = deepcopy(make_state(session=None, local_state='offered', runtime=RUNTIME_IDLE,
+                                peer_b_state='offered', peer_b_session=None))
+    state['peers'][1]['setup_issues'] = worker_view()['local']['setup_issues']
+    status, blockers, _ = analyse(state, [])
+    assert status == STATUS_BLOCKED
+    assert blockers == ['No active session. Start one from the coordinator.']
+
+
+@pytest.mark.parametrize('worker_state,running', [('failed', False), ('worker_ready', False), ('reserved', True)])
+def test_remote_native_failure_blocks_readiness(worker_state, running):
+    state = deepcopy(make_state())
+    state['peers'][1]['state'] = worker_state
+    state['peers'][1]['runtime']['running'] = running
+    assert analyse(state, [state['peers'][1]])[0] == STATUS_BLOCKED
+
+
+def test_fresh_coordinator_snapshot_sets_busy():
+    state = worker_view()
+    coordinator = {**state['peers'][0], 'state': 'computing', 'busy': True}
+    assert analyse(state, [coordinator])[0] == STATUS_BUSY
+
+
+def test_fresh_coordinator_runtime_stopped_blocks_worker_view():
+    state = worker_view()
+    coordinator = deepcopy(state['peers'][0])
+    coordinator['runtime']['running'] = False
+    assert analyse(state, [coordinator])[0] == STATUS_BLOCKED
+
+
+def test_missing_member_never_ready():
+    state = deepcopy(make_state())
+    state['peers'] = state['peers'][:1]
+    assert analyse(state, [])[0] == STATUS_UNKNOWN
+
+
+def test_full_manifest_must_agree_even_with_same_session_id():
+    state = deepcopy(make_state())
+    state['peers'][1]['session'] = {**SESSION, 'model_sha256': 'd' * 64}
+    assert analyse(state, [])[0] == STATUS_BLOCKED
+
+
+def test_three_peer_session_ready_and_missing_third_runtime_unknown():
+    state = deepcopy(make_state())
+    session = {**SESSION, 'members': ['a', 'b', 'c']}
+    state['local']['session'] = session
+    for peer in state['peers']:
+        peer['session'] = session
+    state['peers'][0]['runtime']['placement'] = {'0': 'MTL0', '1': 'RPC0', '2': 'RPC1'}
+    third = {**deepcopy(state['peers'][1]), 'id': 'c', 'name': 'Windows'}
+    state['peers'].append(third)
+    state['expected_peers'] = 3
+    assert analyse(state, [])[0] == STATUS_READY
+    third.pop('runtime')
+    assert analyse(state, [])[0] == STATUS_UNKNOWN
+
+
+@pytest.mark.parametrize('state', [None, [], {'local': None}, {'local': {'id': 'a'}, 'peers': [None]}])
+def test_malformed_api_data_is_unknown(state):
+    assert analyse(state, [])[0] == STATUS_UNKNOWN
+
+
+def test_missing_native_placement_blocks_readiness():
+    state = deepcopy(make_state())
+    state['peers'][0]['runtime']['placement'] = {}
+    assert analyse(state, [])[0] == STATUS_BLOCKED
+
+
+def stub_run(monkeypatch, state, snapshot=None, error=None):
+    settings = SimpleNamespace(api_port=8000, peer_id='a', token='private-control-secret-1234567890',
+        peers=[SimpleNamespace(id='a', name='M4', url='http://a.test'),
+               SimpleNamespace(id='b', name='M3', url='http://b.test')])
+    monkeypatch.setattr(check_demo, 'load_settings', lambda: settings)
+    monkeypatch.setattr(check_demo, '_fetch_state', lambda *args: (state, None))
+    monkeypatch.setattr(check_demo, '_fetch_peer', lambda *args: (snapshot, error))
+    return settings
+
+
+def test_failed_refresh_cannot_reuse_ready_snapshot(monkeypatch, capsys):
+    stub_run(monkeypatch, make_state(), error='timeout')
+    assert check_demo.run(as_json=True) == EXIT_BLOCKED
+    result = json.loads(capsys.readouterr().out)
+    assert result['status'] == STATUS_BLOCKED
+    assert 'timeout' in ' '.join(result['blockers'])
+
+
+def test_wrong_peer_identity_cannot_be_ready(monkeypatch, capsys):
+    stub_run(monkeypatch, make_state(), snapshot={'id': 'unexpected', 'online': True})
+    assert check_demo.run(as_json=True) == EXIT_BLOCKED
+    assert 'identity' in capsys.readouterr().out
+
+
+@pytest.mark.parametrize('as_json', [True, False])
+def test_real_output_path_redacts_credentials(monkeypatch, capsys, as_json):
+    settings = stub_run(monkeypatch, make_state(), error='timeout')
+    monkeypatch.setattr(check_demo, '_fetch_peer', lambda *args: (None, 'Bearer ' + settings.token))
+    assert check_demo.run(as_json=as_json) == EXIT_BLOCKED
+    output = capsys.readouterr().out
+    assert settings.token not in output
+    assert '***REDACTED***' in output
