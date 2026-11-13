@@ -44,7 +44,7 @@ While it is running, list the devices from **A**:
 .venv/bin/python scripts/devices.py
 ```
 
-Use the exact names shown by the pinned runtime. A typical two-Mac configuration on A is `"devices": ["Metal", "RPC0"]` and `"tensor_split": [1, 1]`. Verify that Metal is the local Mac and RPC0 is B. Do not invent names if discovery fails. B can leave `devices` empty when contributing only; it needs discovery and the model file before it can coordinate a later session.
+Use the exact names shown by the pinned runtime. The M4 Pro is confirmed as `MTL0` from a normal Terminal. A typical two-Mac configuration on A is `"devices": ["MTL0", "RPC0"]` and `"tensor_split": [1, 1]`. Verify that MTL0 is the local Mac and RPC0 is B. Do not invent names if discovery fails. B can leave `devices` empty when contributing only; it needs discovery and the model file before it can coordinate a later session.
 
 Stop B's temporary discovery worker with **Ctrl+C** before starting the app-managed session. This releases its RPC port.
 
@@ -65,6 +65,8 @@ On **each** laptop:
 ```
 
 Open **http://localhost:8000** in that laptop's browser. The API also listens on the configured LAN address; dashboard token bootstrap accepts localhost only.
+
+Launch the app from a normal Terminal if a coding agent's restricted shell cannot see Metal. The native child process inherits the environment of the app launcher. Device enumeration alone does not prove model execution.
 
 1. Both owners select **Share this laptop**. Check that both peers appear online.
 2. On A, select **Start shared session**. Loading can take time over Wi-Fi. A ready state requires native model health and layer assignments on every selected device.

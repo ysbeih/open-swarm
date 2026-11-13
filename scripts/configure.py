@@ -37,7 +37,7 @@ def main():
                   "runtime_bin": ".tools/llama.cpp/build/bin" + ("/Release" if i == 2 else ""),
                   "model_path": f"models/granite-4.2-{args.model}-Q4_K_M.gguf",
                   "model_name": f"Granite 4.2 {args.model.upper()} · Q4_K_M",
-                  "model_sha256": "", "worker_device": "CPU" if i == 2 else "Metal",
+                  "model_sha256": "", "worker_device": "CPU" if i == 2 else "MTL0",
                   "devices": [], "tensor_split": [1] * len(hosts), "peers": peers}
         path.write_text(json.dumps(config, indent=2))
         path.chmod(0o600)

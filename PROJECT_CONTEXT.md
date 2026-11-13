@@ -74,17 +74,17 @@ Environment:
 - CMake and AppleClang are available. No global `gh` installed.
 - Pinned llama.cpp source downloaded in `.tools/llama.cpp`. Metal/RPC `llama-server` and `ggml-rpc-server` successfully compiled.
 - Native binaries were rebuilt after the folder rename with corrected rpaths. `llama-server --version` works. A real loopback CPU RPC worker was discovered as RPC0; this is not a physical cluster test.
-- The Codex shell's device discovery has not exposed usable local Metal. Verify from the user's Terminal before diagnosing hardware support. CPU worker execution works; no Metal or distributed generation has run yet.
+- The user's normal Terminal confirmed `MTL0: Apple M4 Pro` with approximately 18,185 MiB free reported by the backend. The Codex shell does not expose usable Metal. Launch the app from normal Terminal for the real Metal run. This available-memory report does not override the owner's 8GB contribution or establish model fit. CPU worker execution works; no Metal generation has run yet.
 - Python compileall hit the host's redirected cache permission. Use `PYTHONDONTWRITEBYTECODE=1` for normal tests or set `PYTHONPYCACHEPREFIX` inside `.state` for compileall; do not request access to unrelated global caches.
 - Official 8B GGUF download is in progress; `.gguf.part` is incomplete and must not be used. No generation or hardware-fit measurement completed. Do not interrupt the downloader casually: the current script does not resume partial files.
-- GitHub CLI is authenticated as ysbeih after user authorization. Config is isolated to ignored `.state/github-ysbeih`, with owner-only permissions. Do not switch global identity or reveal credentials. First source push is being prepared.
+- Source is published at `ysbeih/open-swarm` (initial commit `5f17224`). GitHub CLI is authenticated as ysbeih after user authorization, with config isolated to ignored `.state/github-ysbeih` and owner-only permissions. Do not switch global identity or reveal credentials. Thirteen backend tests and the frontend production build pass. Physical inference remains unverified.
 
 ## Immediate remaining work
 
-1. Push reviewed source so the second Mac can clone it and build the pinned native runtime.
+1. The second Mac can now clone published source and build the pinned native runtime; prerequisite/build completion is pending its owner.
 2. Transfer its ignored peer configuration directly; check authenticated peer connectivity and native device discovery. Stop temporary discovery workers before app-managed startup.
 3. Finish/hash the official 8B download. Run actual two-Mac inference, record layer placement, memory, latency and failure behavior. Loopback success is not physical distribution.
-4. Resolve local Metal visibility from the user's Terminal; do not fabricate device names or claim a successful GPU run.
+4. Launch the local app from the user's Terminal for Metal access; do not claim a successful GPU generation until observed.
 5. Restart the local app with its actual LAN configuration and exact discovered devices, then verify both dashboards.
 6. Add the third laptop and test 30B only after 8B distributed execution works. Preserve the integration profile.
 7. Later: separate watsonx.ai reference run using the provided IBM account, plus hackathon submission evidence.

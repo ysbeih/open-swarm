@@ -19,4 +19,5 @@ def test_fresh_checkout_creates_matching_two_peer_configs(tmp_path, monkeypatch)
     assert a.peer_id == "a" and b.peer_id == "b"
     assert a.bind_host != b.bind_host
     assert a.tensor_split == b.tensor_split == [1, 1]
+    assert a.worker_device == b.worker_device == "MTL0"
     assert not (tmp_path / "config/peer-c.json").exists()
