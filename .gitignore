@@ -1,0 +1,13 @@
+.venv/
+.tools/
+.state/
+models/
+node_modules/
+frontend/dist/
+__pycache__/
+.pytest_cache/
+*.pyc
+.env*
+config/local.json
+config/peer-*.json
+.DS_Store
