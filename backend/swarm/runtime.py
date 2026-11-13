@@ -129,7 +129,7 @@ class NativeRuntime:
 
 def worker_command(settings):
     command = [str(settings.binary("ggml-rpc-server")), "--host", settings.bind_host,
-               "--port", str(settings.rpc_port), "--threads", "4"]
+               "--port", str(settings.rpc_port), "--threads", "4", "--cache"]
     if settings.worker_device:
         command += ["--device", settings.worker_device]
     return command
@@ -146,5 +146,6 @@ def inference_command(settings):
             "--split-mode", "layer", "--n-gpu-layers", "all", "--fit", "off",
             "--load-mode", "none", "--lazy-mode", "off", "--ctx-size", "2048",
             "--parallel", "1", "--batch-size", "128", "--ubatch-size", "64",
+            "--cache-ram", "0",
             "--cache-type-k", "f16", "--cache-type-v", "f16", "--flash-attn", "off",
             "--jinja", "--reasoning", "off", "--threads", "4", "-lv", "5"]

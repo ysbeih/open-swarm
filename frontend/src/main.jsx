@@ -23,8 +23,9 @@ function App() {
   const [prompt, setPrompt] = useState(''), [output, setOutput] = useState('');
   const [running, setRunning] = useState(false), [pending, setPending] = useState('');
   const [result, setResult] = useState(null), [checks, setChecks] = useState(null);
+  const [restoredResult, setRestoredResult] = useState(false);
   const [details, setDetails] = useState(false);
-  const abortRef = useRef(null), tokenRef = useRef('');
+  const abortRef = useRef(null), tokenRef = useRef(''), seenResultRef = useRef(new Set());
 
   async function api(path, method = 'GET', body) {
     const response = await fetch('/api' + path, { method, headers: { Authorization: 'Bearer ' + tokenRef.current, ...(body ? {'Content-Type':'application/json'} : {}) }, body: body ? JSON.stringify(body) : undefined });
@@ -70,8 +71,16 @@ function App() {
   const placements = coordinator?.runtime?.placement || {};
   const placementCount = Object.keys(placements).length;
 
+  useEffect(() => {
+    const saved = coordinator?.last_result;
+    if (running || coordinator?.busy || !saved?.complete || seenResultRef.current.has(saved.request_id)) return;
+    seenResultRef.current.add(saved.request_id);
+    setOutput(saved.output); setResult(saved); setChecks(null); setRestoredResult(true);
+  }, [coordinator?.last_result, coordinator?.busy, running]);
+
   async function run() {
-    setRunning(true); setActionError(''); setOutput(''); setResult(null); setChecks(null);
+    if (coordinator?.last_result) seenResultRef.current.add(coordinator.last_result.request_id);
+    setRunning(true); setActionError(''); setOutput(''); setResult(null); setChecks(null); setRestoredResult(false);
     const controller = new AbortController(); abortRef.current = controller;
     let assembled = '', completed = false;
     try {
@@ -91,7 +100,7 @@ function App() {
           const event = JSON.parse(line.slice(6));
           if (event.type === 'token') { assembled += event.text; setOutput(assembled); }
           if (event.type === 'error') throw new Error(event.message);
-          if (event.type === 'done') { completed = true; setResult(event); if (prompt === data.sample_prompt) setChecks(evaluate(assembled)); }
+          if (event.type === 'done') { completed = true; seenResultRef.current.add(event.request_id); setResult(event); if (prompt === data.sample_prompt) setChecks(evaluate(assembled)); }
         }
       }
       if (!completed) throw new Error('Connection ended. Partial output is incomplete.');
@@ -136,6 +145,7 @@ function App() {
           <div className="prompt-actions"><button className="text-button" disabled={!data || running} onClick={()=>setPrompt(data.sample_prompt)}>Load 3-case JSON test <ArrowUpRight size={13}/></button><span>{prompt.length}/6000</span></div>
           <div className="run-actions"><span className="subtle"><Layers3 size={15}/>{placementCount ? `${placementCount} native layer assignments observed` : 'Model has not been loaded'}</span>{running ? <button className="button secondary" onClick={()=>abortRef.current?.abort()}><Square size={14}/>Cancel</button> : <button className="button primary" disabled={!ready || !prompt.trim() || !!pending} onClick={run}><Play size={15}/>Run on swarm</button>}</div>
           <div className="result-header"><b>Model output</b><span className={'pill '+(result ? 'green':'')}>{running ? 'Streaming' : result ? 'Complete' : output ? 'Incomplete' : 'Awaiting a run'}</span></div>
+          {restoredResult && <p className="panel-description">Latest saved answer from this coordinator. Run your prompt to see a new response stream.</p>}
           <pre className={'output ' + (!output ? 'placeholder' : '')} aria-live="polite">{output || 'Your model’s live response will appear here.'}{running && <span className="cursor">▌</span>}</pre>
           {checks && <div className="checks">{checks.map(check=><span className={check.pass?'pass':'fail'} key={check.name}>{check.pass?<Check size={14}/>:<X size={14}/>} {check.name}</span>)}</div>}
           {result && <div className="timings"><span>First token <b>{time(result.first_token_seconds)}</b></span><span>Total <b>{time(result.elapsed_seconds)}</b></span><span>Output tokens <b>{result.usage?.completion_tokens ?? '—'}</b></span></div>}

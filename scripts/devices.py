@@ -15,6 +15,7 @@ args = parser.parse_args()
 settings = load_settings()
 environment = os.environ.copy()
 environment["GGML_RPC_NO_RDMA"] = "1"
+environment["LLAMA_CACHE"] = str(settings.state_path / "cache")
 if args.worker:
     print("Temporary discovery worker. Stop with Ctrl+C BEFORE starting a session in the app.", flush=True)
     command = worker_command(settings)

@@ -2,7 +2,7 @@
 
 Run one IBM Granite model across laptops that contribute spare memory and compute. Each laptop runs the same peer app; one temporarily coordinates a session. A React dashboard shows live peer status, observed process memory, native layer assignments and RPC graph submissions.
 
-**Status:** working local dashboard, automated lifecycle/API tests, and compiled native runtime. Physical two-laptop inference and memory fit are not yet verified. Start with two Macs and Granite 4.2 8B Q4_K_M; add a third laptop before attempting 30B Q4_K_M. The 8B run validates distribution, not that 8B needs multiple machines.
+**Status:** physical two-Mac inference completed with Granite 4.2 8B Q4_K_M on November 13, 2026, using Metal on the M4 and an RPC Metal worker on the M3. The first completed request used 120 input tokens and 69 output tokens in 11.354 seconds after model loading. This is one measured run, not a benchmark. Memory fit within the owners' full budgets, three-host 30B execution and physical failure recovery remain unverified. The 8B run validates distribution, not that 8B needs multiple machines.
 
 ## First setup on each Mac
 
@@ -46,6 +46,10 @@ While it is running, list the devices from **A**:
 
 Use the exact names shown by the pinned runtime. The M4 Pro is confirmed as `MTL0` from a normal Terminal. A typical two-Mac configuration on A is `"devices": ["MTL0", "RPC0"]` and `"tensor_split": [1, 1]`. Verify that MTL0 is the local Mac and RPC0 is B. Do not invent names if discovery fails. B can leave `devices` empty when contributing only; it needs discovery and the model file before it can coordinate a later session.
 
+The first physical test used `"tensor_split": [9, 1]` over a private phone hotspot to reduce the initial transfer to B. Native logs reported 37 assignments on MTL0 and 4 on RPC0, including the output stage; this was an intentionally uneven split. An earlier equal-split load was stopped before generation because cold loading was slow. Copying the GGUF onto a worker does not bypass RPC tensor transfer.
+
+New worker launches enable the native disk tensor cache (`--cache`), stored under ignored `.state/cache/rpc/`. The first load still transfers weights; subsequent loads can reuse cached tensors. The coordinator disables saved-prompt RAM caching (`--cache-ram 0`) after a physical run spent 51.7 seconds saving/restoring prompt state. This preserves the active attention KV cache. Restart the peer apps and shared session to apply these settings; existing native processes keep their original flags. Post-change physical measurements are recorded in `PROJECT_CONTEXT.md`.
+
 Stop B's temporary discovery worker with **Ctrl+C** before starting the app-managed session. This releases its RPC port.
 
 ## Download the integration model on A only
@@ -76,9 +80,11 @@ Launch the app from a normal Terminal if a coding agent's restricted shell canno
 
 If macOS asks about incoming connections, allow the project processes on the trusted demo network. Do not disable the firewall. API port: 8000; native RPC port: 50052; coordinator inference: localhost 8081. Network isolation on event Wi-Fi can prevent peer access.
 
+The dashboard also displays the coordinator's latest completed answer after a page refresh or an API-initiated run, marked as a saved answer. A new dashboard request streams live. Saved answers do not re-run the prompt currently in the editor, and their original checks are not reconstructed without the original prompt.
+
 ## What this prototype proves
 
-- A single selected model can be placed across native devices, subject to the pending physical test.
+- A single selected 8B model executed across two physical Macs, with native placement and RPC activity recorded.
 - Participants explicitly enable and withdraw their contribution.
 - Any configured peer can submit to the active session. A different coordinator requires a cold reload and its own model file/device configuration.
 - There is no permanent tracker, hosted answer service, credit ledger or automatic failover.
@@ -100,6 +106,8 @@ npm --prefix frontend run build
 Tests cover consent, two-peer routing, immutable reservations, competing starts, stale stop requests, process shutdown, failed workers, API authorization, stream completion and native log parsing. Test doubles are restricted to tests. Passing these checks does not establish physical distributed inference.
 
 Native logs and completed request evidence are saved under `.state/`; all local configuration, tokens, runtime binaries and weights are ignored by Git. The model SHA-256 accompanies successful results. See `PROJECT_CONTEXT.md` for current scope and remaining validation.
+
+To record a request against an already active session, run `.venv/bin/python scripts/record_test.py` (or add `--prompt-file /path/to/prompt.txt`). It waits for readiness and saves the exact input, streamed output, reported token usage, timings, peer snapshots and native coordinator log under `.state/test-runs/`. It does not start a session. This helper records completion; the dashboard owns the built-in sample's correctness checks. These private logs are not committed or uploaded.
 
 The separate IBM watsonx.ai reference run and provided IBM Cloud account usage remain deferred until the core distributed demo works.
 
