@@ -6,7 +6,7 @@ Last updated: November 13, 2026. This record distinguishes completed physical te
 
 ## Objective and current scope
 
-Build a live demonstration of three laptops pooling computing resources to run **one IBM Granite model**, using Codex for development, llama.cpp RPC for model-parallel inference, and React + FastAPI to show each laptop's contribution. User explicitly authorized implementation. Build the core demo first; add the separate watsonx.ai reference run later.
+Build a live demonstration of three laptops pooling computing resources to run **one IBM Granite model**, using llama.cpp RPC for model-parallel inference and React + FastAPI to show each laptop's contribution. User explicitly authorized implementation. Build the core demo first; add the separate watsonx.ai reference run later.
 
 The first user is a developer who wants to test an exact open model artifact that exceeds the memory they can spare. A smaller model cannot validate that artifact. Cloud execution remains a valid alternative; no claim of superior cost, speed, privacy, energy use, or quality has been established. The long-term problem can assume broader scale; the three-machine demo proves a narrow instance.
 
@@ -16,21 +16,21 @@ Working sample: three short support-message extraction cases producing JSON, wit
 
 - Name: **Open Swarm**. GitHub repository: **ysbeih/open-swarm**, now public.
 - Brother: **GarouHD**. GitHub invitation sent; last observed state is pending acceptance.
-- Use the `ysbeih` account, not the other accounts connected to Codex.
-- Codex runs on the user's M4 Mac. IBM Bob handles setup and validation on the user's other Mac (M3), following `SECOND_SETUP.md`. Python, CMake, the pinned Metal build and native RPC discovery are verified. Preserve the working setup. The brother's computer is the Windows peer. These development tools are not core inference dependencies.
+- Use the `ysbeih` account with repository-specific authentication; do not change the global GitHub identity.
+- Development and integration run on the user's M4 Mac. Setup and validation on the user's other Mac (M3) follow `SECOND_SETUP.md`. Python, CMake, the pinned Metal build and native RPC discovery are verified. Preserve the working setup. The brother's computer is the Windows peer.
 - No credits, earning/spending ledger, wallets, or payment.
 - Build for one person; finished beats fancy; show the actual workflow live in person.
 - No permanent central inference service/tracker. Same peer application on each laptop; a session has a temporary coordinator.
 - Latest requested addition: a phone can submit jobs without joining the hotspot, through a separate temporary guest web gateway. Compute peers stay on the trusted private LAN. This does not add internet compute workers or expose native RPC.
 - Manual membership, trusted LAN, one session and one active generation. No internet swarm, NAT traversal, live resharing, failover, marketplace, RAG, generated-code sandbox, or agent framework.
-- User created the separate Open Swarm Codex project; the current chat is already in it.
+- Work in the existing Open Swarm project and preserve its implementation and local state.
 
 ## Hardware and model
 
 | Peer | Owner and hardware | Offered RAM |
 |---|---|---|
-| A | User's Mac M4 Pro, 24 GB installed; Codex integration | 8,000,000,000 bytes |
-| B | User's Mac M3 Pro, 18 GB installed, macOS 14.1; Bob setup assistance | 8,000,000,000 bytes |
+| A | User's Mac M4 Pro, 24 GB installed | 8,000,000,000 bytes |
+| B | User's Mac M3 Pro, 18 GB installed, macOS 14.1 | 8,000,000,000 bytes |
 | C | Brother's Windows laptop, Ryzen AI 9 365, 24 GB installed, Radeon 880M | 8,000,000,000 bytes |
 
 The memory contribution is decimal 8 GB (~7.45 GiB), including runtime overhead, not the entire installed RAM. Shared GPU memory is not additional capacity. macOS Metal on A/B; native CPU on Windows C. No driver or OS upgrade on the critical path.
@@ -55,7 +55,7 @@ Raw llama.cpp RPC is a fragile, insecure prototype. Use only trusted isolated LA
 
 ## Implementation status
 
-Local path: `/Users/viviana/Documents/Codex/2026-11-12/files-pasted-by-the-user-multi/open-swarm`.
+Local checkout: the Open Swarm repository root containing this file.
 
 Implemented, with a completed physical two-Mac inference request:
 
@@ -75,7 +75,7 @@ Environment:
 - CMake and AppleClang are available. No global `gh` installed.
 - Pinned llama.cpp source downloaded in `.tools/llama.cpp`. Metal/RPC `llama-server` and `ggml-rpc-server` successfully compiled.
 - Native binaries were rebuilt after the folder rename with corrected rpaths. `llama-server --version` works. A real loopback CPU RPC worker was discovered as RPC0; this is not a physical cluster test.
-- The user's normal Terminal confirmed `MTL0: Apple M4 Pro` with approximately 18,185 MiB free reported by the backend. The Codex shell does not expose usable Metal. Launch the app from normal Terminal for the real Metal run. This available-memory report does not override the owner's 8GB contribution or establish model fit. Physical Metal generation is now verified on both Macs through RPC. An escalated project launcher also exposed Metal and LAN access during integration.
+- The user's normal Terminal confirmed `MTL0: Apple M4 Pro` with approximately 18,185 MiB free reported by the backend. The restricted development shell used during initial setup did not expose usable Metal. Launch the app from normal Terminal for the real Metal run. This available-memory report does not override the owner's 8GB contribution or establish model fit. Physical Metal generation is now verified on both Macs through RPC. An escalated project launcher also exposed Metal and LAN access during integration.
 - Python compileall hit the host's redirected cache permission. Use `PYTHONDONTWRITEBYTECODE=1` for normal tests or set `PYTHONPYCACHEPREFIX` inside `.state` for compileall; do not request access to unrelated global caches.
 - Official 8B GGUF download completed and passed the downloader's SHA-256/size checks: 5,347,917,952 bytes; SHA-256 `16a9369d0805f80b7377d25d87f937a90c05dc04ad79173a52001e42c9aab311`. Final `.gguf` and metadata are present. A physical two-Mac generation completed; full hardware-fit validation remains incomplete.
 - M3 direct Terminal output confirms Python 3.12.16, CMake 4.5.0 and the configured Apple CommandLineTools path. The native Metal build and M4-to-M3 RPC discovery subsequently succeeded. To avoid installing Node on this worker, a verified ZIP of the already-built frontend is available locally at `.state/second-setup-ui.zip`; transfer it directly and extract from the M3 repo root. It contains only `frontend/dist/` assets, no tokens or model weights.
