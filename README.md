@@ -111,6 +111,35 @@ To record a request against an already active session, run `.venv/bin/python scr
 
 The separate IBM watsonx.ai reference run and provided IBM Cloud account usage remain deferred until the core distributed demo works.
 
+## Temporary phone access
+
+The optional guest gateway lets a phone submit a test without joining the laptops' LAN. The model still executes on the private compute peers. This is guest access to inference, not internet membership in the compute pool.
+
+Keep the normal peer app and a working shared session running. In another terminal on the coordinator:
+
+```bash
+.venv/bin/python -m pip install -r requirements-guest.txt
+.venv/bin/python scripts/guest.py --port 8002 --minutes 120 --max-jobs 20
+```
+
+This creates a separate pass in ignored `.state/guest-pass.json` and binds a guest-only web service to localhost. It accepts one request at a time, at most 2,000 prompt characters and 128 output tokens, with a shared 20-request allowance. The pass expires after two hours. It does not serve the peer control API, bootstrap credentials, native logs, model files or RPC. Inputs, outputs and usage are recorded privately under `.state/guest-jobs/`. Windows uses `.venv\Scripts\python.exe` for these commands.
+
+After approving Cloudflare as the relay for non-sensitive demo prompts and outputs, use its official `cloudflared` binary in a separate terminal:
+
+```bash
+cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8002 --protocol http2
+```
+
+Tunnel **only port 8002**. Do not tunnel port 8000, port 8081 or native RPC. The temporary HTTPS hostname is printed by Cloudflare. Generate the full private guest link and QR code:
+
+```bash
+.venv/bin/python scripts/guest_link.py --url https://YOUR-HOSTNAME.trycloudflare.com
+```
+
+Share `.state/guest-url.txt` or `.state/guest-qr.png` only with intended guests. The URL fragment contains the limited guest pass; it is distinct from the private control token. The page stores it for that browser tab and removes it from the address bar. A bare tunnel URL can display the page but cannot submit jobs or retrieve results without the pass. Stopping the guest gateway revokes its pass; stopping the tunnel removes external reachability. Neither requires stopping the model session.
+
+The phone polls for partial output because [Cloudflare Quick Tunnels do not support SSE](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). These temporary tunnels have no uptime guarantee. The underlying guest gateway consumes the existing native stream and marks interrupted output incomplete.
+
 ## Sources
 
 - [Pinned llama.cpp runtime](https://github.com/ggml-org/llama.cpp/tree/5676dfbe01e7ebe0387913680eee0ed39bf4a363)

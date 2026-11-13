@@ -21,6 +21,7 @@ Working sample: three short support-message extraction cases producing JSON, wit
 - No credits, earning/spending ledger, wallets, or payment.
 - Build for one person; finished beats fancy; show the actual workflow live in person.
 - No permanent central inference service/tracker. Same peer application on each laptop; a session has a temporary coordinator.
+- Latest requested addition: a phone can submit jobs without joining the hotspot, through a separate temporary guest web gateway. Compute peers stay on the trusted private LAN. This does not add internet compute workers or expose native RPC.
 - Manual membership, trusted LAN, one session and one active generation. No internet swarm, NAT traversal, live resharing, failover, marketplace, RAG, generated-code sandbox, or agent framework.
 - User created the separate Open Swarm Codex project; the current chat is already in it.
 
@@ -102,6 +103,14 @@ Performance finding: the native log for that UI request reports `prompt cache up
 4. Source, recorder, frontend fix and neutral second-setup instructions are published in `b55d7ba`. Keep local configuration, token, evidence, binaries and model weights private. M3 needs a frontend rebuild if it has not yet done one; that UI update does not require another worker restart.
 5. Add the third laptop and test 30B only after the working two-Mac profile is preserved. No 30B model execution or reference equivalence is verified.
 6. Later: separate watsonx.ai reference run using the provided IBM account, plus hackathon submission evidence.
+
+## Guest gateway checkpoint
+
+Implemented `backend/swarm/guest.py`, `scripts/guest.py`, a small responsive `guest/` frontend, and `scripts/guest_link.py` with optional QR dependencies in `requirements-guest.txt`. It is a separate localhost service on port 8002; do not mount or tunnel the control API. A randomly generated guest pass lasts up to two hours by default, allows 20 total jobs, and is separate from the peer bearer token. Inputs are capped at 2,000 characters and replies at 128 tokens; only one guest job runs at a time. The guest API exports a small allowlist of result/status fields and records full job input/output/usage privately under `.state/guest-jobs/`.
+
+Seventeen tests pass, including guest authorization, expiry, absent control routes, body limits, busy/quota handling, output completion and local-record permissions. Frontend production build and guest JavaScript syntax checks pass. A real local guest-page request executed across both Macs and visibly completed in 11.77 seconds with 69 output tokens; native inference stayed loaded. The guest page was inspected at a phone-size viewport. This is not yet evidence of access from a physical phone's cellular network.
+
+Cloudflare's official macOS ARM64 binary version 2026.11.0 was downloaded into ignored `.tools/cloudflared/` and verified against the release asset SHA-256. Opening the public tunnel was rejected by automatic approval review because guest prompts/outputs would traverse Cloudflare and that specific destination had not been explicitly approved. User approval was requested with the bounded scope and non-sensitive demo-data restriction. Do not retry the tunnel until that approval arrives. No public tunnel is running at this checkpoint. The guest gateway itself is running locally; public URL/QR creation and external verification remain pending.
 
 ## Hackathon and original research
 

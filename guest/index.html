@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Open Swarm · Guest pass</title><link rel="stylesheet" href="/guest.css"><script src="/guest.js" defer></script></head>
+<body><main>
+  <header><a href="/" aria-label="Open Swarm home">open<span>swarm</span></a><span class="badge">GUEST PASS</span></header>
+  <section class="intro"><p class="eyebrow">SHARED CAPACITY. REAL INFERENCE.</p><h1>Your prompt.<br><span>Our laptops.</span></h1><p>Try one Granite model running across the computers your host is sharing.</p></section>
+  <section class="pool" aria-label="Swarm status"><div class="status-line"><span class="dot"></span><strong id="status">Connecting…</strong></div><p id="model">Checking the shared model</p><div id="peers"></div></section>
+  <div id="error" role="alert" hidden></div>
+  <section class="work"><label for="prompt">What would you like to test?</label><textarea id="prompt" maxlength="2000" rows="6" placeholder="Enter a short, non-sensitive test prompt"></textarea><div class="prompt-tools"><button id="sample" class="text-button" type="button" disabled>Try the sample</button><span id="count">0 / 2,000</span></div><button id="run" class="primary" type="button" disabled>Run on shared laptops <span aria-hidden="true">↗</span></button>
+  <div class="result-heading"><h2>Model output</h2><span id="result-status" class="badge">AWAITING A RUN</span></div><pre id="output" aria-live="polite">Your answer will appear here.</pre><div id="metrics" hidden></div><button id="copy" class="text-button" type="button" hidden>Copy answer</button></section>
+  <footer><p>Your phone submits the request. The laptops run the model.</p><p>Requests pass through a temporary web relay. Demo inputs and outputs are saved on the host. Use non-sensitive text.</p><span id="allowance"></span></footer>
+</main></body></html>
