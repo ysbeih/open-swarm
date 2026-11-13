@@ -57,6 +57,8 @@ class PeerService:
         self.start_task = None
         self.request_count = 0
         self.last_result = None
+        self._health_session_id = None
+        self._peer_health_misses = {}
         self.marker = settings.state_path / "session.json"
         self.unclean = None
         if self.marker.exists():
@@ -249,7 +251,7 @@ class PeerService:
                 await self.runtime.start(inference_command(self.settings), "coordinator", manifest.id)
                 self.persist()
             self.event("All peers acknowledged. Loading model across the configured devices.")
-            deadline = time.monotonic() + 600
+            deadline = time.monotonic() + self.settings.model_load_timeout_seconds
             while time.monotonic() < deadline:
                 if self.manifest != manifest or not self.runtime.running:
                     raise RuntimeError("Model process exited or session stopped; inspect native logs")
@@ -270,7 +272,7 @@ class PeerService:
                 except httpx.HTTPError:
                     pass
                 await asyncio.sleep(0.5)
-            raise RuntimeError("Model load exceeded the 10-minute setup timeout")
+            raise RuntimeError(f"Model load exceeded the {self.settings.model_load_timeout_seconds}-second setup timeout")
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -334,6 +336,44 @@ class PeerService:
         self.state = "offered" if self.sharing else "off"
         return self.snapshot()
 
+    async def check_required_peers(self):
+        current = self.manifest
+        if not current or current.coordinator != self.settings.peer_id:
+            return
+        snapshots = await self.peers_snapshot()
+        if self.manifest != current or self.state not in ("ready", "computing"):
+            return
+        if self._health_session_id != current.id:
+            self._health_session_id = current.id
+            self._peer_health_misses.clear()
+        by_id = {p["id"]: p for p in snapshots}
+        failures = []
+        for member in current.members:
+            if member == self.settings.peer_id:
+                continue
+            peer = by_id.get(member, {})
+            name = peer.get("name", member)
+            if not peer.get("online"):
+                misses = self._peer_health_misses.get(member, 0) + 1
+                self._peer_health_misses[member] = misses
+                if misses == 1:
+                    self.event(f"Health check missed for {name}; retrying before stopping the session.", "warning")
+                if misses >= 3:
+                    failures.append(f"{name}: unavailable for 3 consecutive health checks")
+                continue
+            self._peer_health_misses.pop(member, None)
+            # A reachable peer's explicit failure or withdrawal is authoritative.
+            if (not peer.get("sharing") or peer.get("state") != "worker_ready"
+                    or not (peer.get("runtime") or {}).get("running")
+                    or peer.get("session") != current.model_dump()):
+                failures.append(f"{name}: sharing, native runtime or session no longer valid")
+        if failures:
+            await self.runtime.stop()
+            if self.manifest == current:
+                self.state = "failed"
+                self.error = "; ".join(failures) + ". Stop/reset before retrying."
+                self.event(self.error, "error")
+
     async def monitor(self):
         while True:
             self.runtime.sample()
@@ -348,17 +388,7 @@ class PeerService:
                     self.state, self.error = "failed", "Native runtime exited unexpectedly"
                     self.event(self.error, "error")
                 elif self.manifest.coordinator == self.settings.peer_id:
-                    current = self.manifest
-                    snapshots = await self.peers_snapshot()
-                    if self.manifest != current:
-                        continue
-                    failed = [p for p in snapshots if p["id"] != self.settings.peer_id and
-                              (not p.get("online") or p.get("state") not in ("worker_ready", "ready", "computing") or
-                               (p.get("session") or {}).get("id") != current.id)]
-                    if failed:
-                        await self.runtime.stop()
-                        self.state, self.error = "failed", "A required peer became unavailable. Stop/reset before retrying."
-                        self.event(self.error, "error")
+                    await self.check_required_peers()
             await asyncio.sleep(1)
 
     async def reserve_request(self, session_id):
