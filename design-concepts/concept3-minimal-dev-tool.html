@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open Swarm — Concept 3: Minimal Dev Tool [SAMPLE DATA]</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f9fa;--surface:#ffffff;--surface2:#f1f3f5;--border:#dee2e6;
+  --accent:#3b82f6;--green:#16a34a;--yellow:#ca8a04;--red:#dc2626;
+  --text:#212529;--muted:#6c757d;--code:#6366f1;
+  --font:-apple-system,"Segoe UI",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono","Fira Code",monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;line-height:1.5;min-height:100vh}
+.sample-banner{background:#fffbeb;border-bottom:1px solid #fcd34d;color:#92400e;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;padding:4px}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:40px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;font-family:var(--mono)}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.hright{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted)}
+.status-chip{display:flex;align-items:center;gap:5px;font-weight:600}
+.chip-dot{width:6px;height:6px;border-radius:50%}
+.chip-dot.green{background:var(--green)}.chip-dot.yellow{background:var(--yellow)}.chip-dot.red{background:var(--red)}.chip-dot.gray{background:#9ca3af}
+.status-chip.ok{color:var(--green)}.status-chip.busy{color:var(--yellow)}.status-chip.off{color:var(--muted)}
+.wrap{max-width:860px;margin:0 auto;padding:16px}
+.state-tabs{display:flex;gap:4px;margin-bottom:14px}
+.stab{padding:3px 10px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:11px;font-family:inherit}
+.stab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.section{margin-bottom:14px}
+.slabel{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+.peers{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;position:relative}
+.card.active{border-left:3px solid var(--green)}
+.card.loading{border-left:3px solid var(--yellow)}
+.card.offline{border-left:3px solid var(--border);opacity:.55}
+.card-id{font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.08em}
+.card-name{font-size:13px;font-weight:600;color:var(--text);margin-top:1px}
+.card-ip{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:1px}
+.card-status{position:absolute;top:10px;right:10px}
+.rows{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:8px}
+.row{display:flex;justify-content:space-between;font-size:11px}
+.rk{color:var(--muted)}.rv{font-family:var(--mono);font-weight:600;color:var(--text)}
+.rv.g{color:var(--green)}.rv.y{color:var(--yellow)}.rv.b{color:var(--accent)}
+.bar{background:var(--surface2);border-radius:2px;height:3px;margin-top:5px;overflow:hidden}
+.bf{height:100%;border-radius:2px;background:var(--accent);transition:width .4s}
+.bf.green{background:var(--green)}.bf.yellow{background:var(--yellow);animation:yb 1.2s ease-in-out infinite}
+@keyframes yb{0%,100%{opacity:.5}50%{opacity:1}}
+.layers{display:flex;gap:1.5px;margin-top:5px;flex-wrap:wrap}
+.lbit{width:7px;height:7px;border-radius:1px;background:var(--border)}
+.lbit.on{background:var(--green)}.lbit.pend{background:var(--yellow)}
+.dist-panel{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:14px}
+.dist-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.dist-title{font-size:12px;font-weight:600}
+.dist-meta{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.dist-track{display:flex;height:20px;border-radius:3px;overflow:hidden;gap:1px}
+.ds{display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;font-family:var(--mono);transition:width .4s}
+.ds-a{background:#93c5fd;color:#1e3a8a}.ds-b{background:#86efac;color:#14532d}.ds-c{background:#fde68a;color:#78350f}
+.dist-legs{display:flex;gap:12px;margin-top:6px}
+.dleg{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.dleg-dot{width:7px;height:7px;border-radius:50%}
+.prompt-panel{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:14px}
+.phead{padding:7px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
+.phead-label{font-size:11px;font-weight:600;font-family:var(--mono);color:var(--muted)}
+.pinput{padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.6;white-space:pre-wrap;border-bottom:1px solid var(--border)}
+.poutput{padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--code);line-height:1.6;white-space:pre-wrap;min-height:36px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.pfoot{padding:7px 12px;display:flex;gap:7px;align-items:center}
+.btn{padding:4px 12px;border-radius:4px;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit}
+.btn.p{background:var(--accent);color:#fff}.btn.s{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.btn:hover{opacity:.85}
+.pfoot-meta{font-size:11px;color:var(--muted);margin-left:4px;font-family:var(--mono)}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px}
+.stat-val{font-size:16px;font-weight:800;font-family:var(--mono);color:var(--text)}
+.stat-label{font-size:10px;color:var(--muted);margin-top:2px}
+.stat-note{font-size:10px;color:var(--muted);font-style:italic;margin-top:1px}
+@media(max-width:680px){
+  .peers{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="sample-banner">⚠ SAMPLE DATA — Visual concept only. No real network, model, or inference.</div>
+<header class="header">
+  <div class="logo"><div class="logo-dot"></div>open-swarm</div>
+  <div class="hright">
+    <span class="status-chip ok" id="sess-chip"><div class="chip-dot green"></div>session active</span>
+    <span style="font-family:var(--mono)">granite-4.2-8b-Q4_K_M</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="state-tabs">
+    <button class="stab on" onclick="ss('active',this)">active</button>
+    <button class="stab" onclick="ss('loading',this)">loading</button>
+    <button class="stab" onclick="ss('lost',this)">peer lost</button>
+    <button class="stab" onclick="ss('done',this)">done</button>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat"><div class="stat-val" id="sv-graphs">3,683</div><div class="stat-label">graph submissions</div><div class="stat-note">≠ tokens</div></div>
+    <div class="stat"><div class="stat-val">2,048</div><div class="stat-label">context tokens</div></div>
+    <div class="stat"><div class="stat-val">32</div><div class="stat-label">model layers</div><div class="stat-note">split across peers</div></div>
+    <div class="stat"><div class="stat-val">5.35 GB</div><div class="stat-label">model on disk</div><div class="stat-note">Q4_K_M</div></div>
+  </div>
+
+  <div class="section">
+    <div class="slabel">Peers</div>
+    <div class="peers">
+      <div class="card active" id="ca">
+        <div class="card-status"><span class="status-chip ok" id="sa"><div class="chip-dot green"></div>online</span></div>
+        <div class="card-id">PEER A · coordinator</div>
+        <div class="card-name">MacBook M4 Pro</div>
+        <div class="card-ip">172.20.10.14 · MTL0</div>
+        <div class="rows">
+          <div class="row"><span class="rk">rss</span><span class="rv b" id="pa-rss">4.2 GB</span></div>
+          <div class="row"><span class="rk">layers</span><span class="rv g" id="pa-lay">20/32</span></div>
+          <div class="row"><span class="rk">graphs</span><span class="rv" id="pa-gr">1,842</span></div>
+          <div class="row"><span class="rk">offer</span><span class="rv">8.0 GB</span></div>
+        </div>
+        <div class="bar"><div class="bf green" id="ba" style="width:52%"></div></div>
+        <div class="layers" id="la"></div>
+      </div>
+      <div class="card active" id="cb">
+        <div class="card-status"><span class="status-chip ok" id="sb"><div class="chip-dot green"></div>online</span></div>
+        <div class="card-id">PEER B · worker</div>
+        <div class="card-name">MacBook M3 Pro</div>
+        <div class="card-ip">172.20.10.7 · MTL0</div>
+        <div class="rows">
+          <div class="row"><span class="rk">rss</span><span class="rv b" id="pb-rss">3.1 GB</span></div>
+          <div class="row"><span class="rk">layers</span><span class="rv g" id="pb-lay">12/32</span></div>
+          <div class="row"><span class="rk">graphs</span><span class="rv" id="pb-gr">1,841</span></div>
+          <div class="row"><span class="rk">offer</span><span class="rv">8.0 GB</span></div>
+        </div>
+        <div class="bar"><div class="bf green" id="bb" style="width:38%"></div></div>
+        <div class="layers" id="lb"></div>
+      </div>
+      <div class="card offline" id="cc">
+        <div class="card-status"><span class="status-chip off"><div class="chip-dot gray"></div>offline</span></div>
+        <div class="card-id">PEER C · —</div>
+        <div class="card-name">Windows Ryzen AI</div>
+        <div class="card-ip">172.20.10.21 · CPU</div>
+        <div class="rows">
+          <div class="row"><span class="rk">rss</span><span class="rv">—</span></div>
+          <div class="row"><span class="rk">layers</span><span class="rv">—</span></div>
+          <div class="row"><span class="rk">graphs</span><span class="rv">—</span></div>
+          <div class="row"><span class="rk">offer</span><span class="rv">8.0 GB</span></div>
+        </div>
+        <div class="bar"><div class="bf" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dist-panel">
+    <div class="dist-header">
+      <span class="dist-title">Tensor distribution</span>
+      <span class="dist-meta">32 layers · --rpc 172.20.10.7:50052 · tensor_split [1,1]</span>
+    </div>
+    <div class="dist-track">
+      <div class="ds ds-a" id="da" style="width:62.5%">A:20L</div>
+      <div class="ds ds-b" id="db" style="width:37.5%">B:12L</div>
+    </div>
+    <div class="dist-legs">
+      <div class="dleg"><div class="dleg-dot" style="background:#93c5fd"></div>Peer A — M4 Pro (coordinator, holds model file)</div>
+      <div class="dleg"><div class="dleg-dot" style="background:#86efac"></div>Peer B — M3 Pro (rpc worker, disk cache)</div>
+      <div class="dleg"><div class="dleg-dot" style="background:#d1d5db"></div>Peer C — not connected</div>
+    </div>
+  </div>
+
+  <div class="prompt-panel">
+    <div class="phead"><span class="phead-label">prompt / response</span><span style="font-size:10px;color:var(--muted)">SAMPLE DATA</span></div>
+    <div class="pinput">Extract issue_type, severity, product from:
+"Db2 cluster throwing ORA-12154 on every connection after last patch. Blocking ETL."</div>
+    <div class="poutput" id="resp">{"issue_type": "connection_error", "severity": "critical", "product": "Db2", "error_code": "ORA-12154", "affected_component": "ETL pipeline"}</div>
+    <div class="pfoot">
+      <button class="btn p" onclick="runIt()">run</button>
+      <button class="btn s" onclick="document.getElementById('resp').textContent=''">clear</button>
+      <span class="pfoot-meta" id="run-meta">greedy · context 2048 · 2 peers</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function bl(id,n,tot,cls){var e=document.getElementById(id);if(!e)return;e.innerHTML='';for(var i=0;i<tot;i++){var b=document.createElement('div');b.className='lbit'+(i<n?' '+cls:'');e.appendChild(b);}}
+bl('la',20,32,'on');bl('lb',12,32,'on');
+
+function ss(state,btn){
+  document.querySelectorAll('.stab').forEach(function(t){t.classList.remove('on')});btn.classList.add('on');
+  var ca=document.getElementById('ca'),cb=document.getElementById('cb');
+  var sa=document.getElementById('sa'),sb=document.getElementById('sb');
+  var da=document.getElementById('da'),db=document.getElementById('db');
+  var ba=document.getElementById('ba'),bb=document.getElementById('bb');
+  var sc=document.getElementById('sess-chip');
+  if(state==='active'){
+    ca.className='card active';cb.className='card active';
+    sa.className='status-chip ok';sa.innerHTML='<div class="chip-dot green"></div>online';
+    sb.className='status-chip ok';sb.innerHTML='<div class="chip-dot green"></div>online';
+    sc.className='status-chip ok';sc.innerHTML='<div class="chip-dot green"></div>session active';
+    ba.className='bf green';ba.style.width='52%';
+    bb.className='bf green';bb.style.width='38%';
+    bl('la',20,32,'on');bl('lb',12,32,'on');
+    da.style.width='62.5%';da.textContent='A:20L';db.style.width='37.5%';db.textContent='B:12L';
+    document.getElementById('pa-lay').textContent='20/32';document.getElementById('pb-lay').textContent='12/32';
+  } else if(state==='loading'){
+    ca.className='card loading';cb.className='card loading';
+    sa.className='status-chip busy';sa.innerHTML='<div class="chip-dot yellow"></div>loading';
+    sb.className='status-chip busy';sb.innerHTML='<div class="chip-dot yellow"></div>loading';
+    sc.className='status-chip busy';sc.innerHTML='<div class="chip-dot yellow"></div>loading model';
+    ba.className='bf yellow';ba.style.width='40%';
+    bb.className='bf yellow';bb.style.width='20%';
+    bl('la',0,32,'');bl('lb',0,32,'');
+    da.style.width='50%';da.textContent='…';db.style.width='50%';db.textContent='…';
+    document.getElementById('pa-lay').textContent='—';document.getElementById('pb-lay').textContent='—';
+  } else if(state==='lost'){
+    ca.className='card active';cb.className='card offline';
+    sa.className='status-chip ok';sa.innerHTML='<div class="chip-dot green"></div>online';
+    sb.className='status-chip off';sb.innerHTML='<div class="chip-dot gray"></div>offline';
+    sc.className='status-chip busy';sc.innerHTML='<div class="chip-dot yellow"></div>peer lost';
+    ba.className='bf green';ba.style.width='100%';
+    bb.className='bf';bb.style.width='0%';
+    bl('la',32,32,'on');bl('lb',0,32,'');
+    da.style.width='100%';da.textContent='A:32L (fallback)';db.style.width='0%';db.textContent='';
+    document.getElementById('pa-lay').textContent='32/32';document.getElementById('pb-lay').textContent='—';
+  } else {
+    ca.className='card active';cb.className='card active';
+    sa.className='status-chip ok';sa.innerHTML='<div class="chip-dot green"></div>done';
+    sb.className='status-chip ok';sb.innerHTML='<div class="chip-dot green"></div>done';
+    sc.className='status-chip ok';sc.innerHTML='<div class="chip-dot green"></div>completed';
+    ba.className='bf green';ba.style.width='52%';
+    bb.className='bf green';bb.style.width='38%';
+    bl('la',20,32,'on');bl('lb',12,32,'on');
+    da.style.width='62.5%';da.textContent='A:20L';db.style.width='37.5%';db.textContent='B:12L';
+  }
+}
+
+var resps=['{"issue_type": "connection_error", "severity": "critical", "product": "Db2", "error_code": "ORA-12154", "affected_component": "ETL pipeline"}','{"issue_type": "performance", "severity": "high", "product": "CICS", "error_code": null, "affected_component": "transaction throughput"}','{"issue_type": "disk_full", "severity": "medium", "product": "z/OS", "error_code": "IEC030I", "affected_component": "JES spool"}'];
+var ri=0;
+function runIt(){
+  var full=resps[ri++%resps.length];var i=0;
+  document.getElementById('resp').textContent='▌';
+  var iv=setInterval(function(){document.getElementById('resp').textContent=full.slice(0,i)+'▌';i+=4;if(i>=full.length){clearInterval(iv);document.getElementById('resp').textContent=full;}},25);
+  var base=parseInt(document.getElementById('sv-graphs').textContent.replace(',',''));
+  var t=setInterval(function(){base+=Math.floor(Math.random()*15)+5;document.getElementById('sv-graphs').textContent=base.toLocaleString();},70);
+  setTimeout(function(){clearInterval(t);},1400);
+}
+</script>
+</body>
+</html>

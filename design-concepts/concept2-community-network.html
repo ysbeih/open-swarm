@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open Swarm — Concept 2: Community Network [SAMPLE DATA]</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fafaf8;--surface:#ffffff;--surface2:#f4f3ef;--border:#e5e3dc;
+  --accent:#d97706;--accent2:#059669;--blue:#2563eb;
+  --text:#1c1917;--muted:#78716c;--light:#a8a29e;
+  --font:-apple-system,"Segoe UI",system-ui,sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;min-height:100vh}
+.sample-banner{background:#fefce8;border-bottom:1px solid #fde68a;color:#92400e;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;padding:5px}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-text{font-size:18px;font-weight:800;color:var(--text)}
+.logo-sub{font-size:12px;color:var(--muted);margin-left:4px;font-weight:400}
+.header-status{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--accent2);font-weight:600}
+.pulse{width:9px;height:9px;border-radius:50%;background:var(--accent2);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.8)}}
+.hero{background:linear-gradient(135deg,#fffbf0 0%,#f0fdf4 100%);border-bottom:1px solid var(--border);padding:28px;text-align:center}
+.hero-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:6px}
+.hero-sub{font-size:14px;color:var(--muted);max-width:480px;margin:0 auto 16px}
+.hero-model-tag{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:13px;font-weight:600;color:var(--text)}
+.model-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.main{max-width:900px;margin:0 auto;padding:24px;display:flex;flex-direction:column;gap:24px}
+.slabel{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:12px}
+.state-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.stab{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:12px;font-family:inherit;font-weight:500}
+.stab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.peers{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;transition:box-shadow .2s}
+.card.active{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(5,150,105,.1)}
+.card.loading{border-color:var(--accent);box-shadow:0 0 0 3px rgba(217,119,6,.08)}
+.card.offline{opacity:.55;border-style:dashed}
+.avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;margin-bottom:10px}
+.avatar.a{background:#dbeafe;color:var(--blue)}
+.avatar.b{background:#d1fae5;color:var(--accent2)}
+.avatar.c{background:#f3f4f6;color:#6b7280}
+.cname{font-size:14px;font-weight:700;color:var(--text)}
+.chw{font-size:12px;color:var(--muted);margin-top:2px}
+.crole{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:5px}
+.crole.coord{background:#dbeafe;color:var(--blue)}
+.crole.worker{background:#d1fae5;color:var(--accent2)}
+.crole.off{background:#f3f4f6;color:#9ca3af}
+.cstatus{position:absolute;top:14px;right:14px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px}
+.cstatus .dot{width:7px;height:7px;border-radius:50%}
+.cstatus.ok .dot{background:var(--accent2)}.cstatus.ok{color:var(--accent2)}
+.cstatus.busy .dot{background:var(--accent)}.cstatus.busy{color:var(--accent)}
+.cstatus.off .dot{background:#d1d5db}.cstatus.off{color:#9ca3af}
+.contrib{margin-top:12px}
+.contrib-label{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:4px}
+.contrib-bar{background:var(--surface2);border-radius:4px;height:8px;overflow:hidden}
+.contrib-fill{height:100%;border-radius:4px;background:var(--accent2);transition:width .4s}
+.contrib-fill.loading-bar{background:var(--accent);animation:loadbar 1.5s ease-in-out infinite}
+@keyframes loadbar{0%{width:20%}50%{width:70%}100%{width:20%}}
+.layers-mini{display:flex;gap:2px;margin-top:8px;flex-wrap:wrap}
+.lm{width:8px;height:8px;border-radius:1px;background:var(--border)}
+.lm.on{background:var(--accent2)}.lm.pend{background:var(--accent)}
+.dist-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px}
+.dist-title{font-size:14px;font-weight:700;margin-bottom:14px}
+.dist-visual{display:flex;align-items:stretch;gap:12px}
+.dist-peers{display:flex;flex-direction:column;gap:8px;min-width:120px}
+.dist-peer-row{display:flex;align-items:center;gap:8px;font-size:12px}
+.dp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.dist-bar-wrap{flex:1}
+.dist-bar-track{background:var(--surface2);border-radius:6px;height:32px;overflow:hidden;display:flex}
+.dseg{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:width .4s}
+.dseg-a{background:#93c5fd;color:#1e3a8a}.dseg-b{background:#6ee7b7;color:#065f46}.dseg-c{background:#fcd34d;color:#78350f}
+.prompt-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.phead{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.phead-title{font-size:14px;font-weight:700}
+.pbody{padding:14px 18px;font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface2);border-bottom:1px solid var(--border);font-style:italic}
+.rbody{padding:14px 18px;font-family:monospace;font-size:13px;color:#065f46;line-height:1.7;white-space:pre-wrap;background:#f0fdf4;min-height:50px;border-bottom:1px solid var(--border)}
+.pactions{padding:12px 18px;display:flex;gap:10px;align-items:center}
+.btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit}
+.btn.p{background:var(--accent);color:#fff}.btn.s{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.btn:hover{opacity:.88}
+.sharing-note{font-size:12px;color:var(--muted);margin-left:4px}
+.info-row{display:flex;gap:16px;flex-wrap:wrap}
+.info-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;flex:1;min-width:140px}
+.ic-label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+.ic-val{font-size:18px;font-weight:800;color:var(--text)}
+.ic-sub{font-size:11px;color:var(--light);margin-top:2px}
+@media(max-width:680px){
+  .peers{grid-template-columns:1fr}
+  .dist-visual{flex-direction:column}
+  .dist-peers{flex-direction:row;min-width:0}
+  .info-row{flex-direction:column}
+  .hero-title{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="sample-banner">⚠ SAMPLE DATA — Visual concept only. No real network, model, or inference.</div>
+<header class="header">
+  <div class="logo">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <circle cx="16" cy="16" r="15" fill="#fffbf0" stroke="#e5e3dc" stroke-width="1.5"/>
+      <circle cx="16" cy="9" r="3.5" fill="#d97706"/>
+      <circle cx="9" cy="23" r="3.5" fill="#059669"/>
+      <circle cx="23" cy="23" r="3.5" fill="#2563eb"/>
+      <line x1="16" y1="12.5" x2="9" y2="19.5" stroke="#d97706" stroke-width="1.5" opacity=".5"/>
+      <line x1="16" y1="12.5" x2="23" y2="19.5" stroke="#d97706" stroke-width="1.5" opacity=".5"/>
+    </svg>
+    <div>
+      <span class="logo-text">Open Swarm</span>
+      <span class="logo-sub">shared compute</span>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="pulse"></div>
+    2 people sharing
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-title">Your spare memory, put to work</div>
+  <div class="hero-sub">Three laptops. One model. Everyone contributes what they can spare.</div>
+  <div class="hero-model-tag"><div class="model-dot"></div>IBM Granite 4.2 · 8B Q4_K_M · 5.35 GB</div>
+</div>
+
+<div class="main">
+  <div class="state-tabs">
+    <button class="stab on" onclick="ss('active',this)">Session active</button>
+    <button class="stab" onclick="ss('loading',this)">Loading model</button>
+    <button class="stab" onclick="ss('lost',this)">Peer stopped sharing</button>
+    <button class="stab" onclick="ss('done',this)">Completed</button>
+  </div>
+
+  <div>
+    <div class="slabel">Who's sharing right now</div>
+    <div class="peers">
+      <div class="card active" id="ca">
+        <div class="cstatus ok" id="sa"><div class="dot"></div>Sharing</div>
+        <div class="avatar a">Y</div>
+        <div class="cname">Yassine's MacBook</div>
+        <div class="chw">M4 Pro · 24 GB installed</div>
+        <div class="crole coord" id="ra">Coordinating</div>
+        <div class="contrib">
+          <div class="contrib-label"><span>Memory in use</span><span>4.2 / 8.0 GB offered</span></div>
+          <div class="contrib-bar"><div class="contrib-fill" id="fa" style="width:52%"></div></div>
+        </div>
+        <div class="layers-mini" id="la"></div>
+      </div>
+      <div class="card active" id="cb">
+        <div class="cstatus ok" id="sb"><div class="dot"></div>Sharing</div>
+        <div class="avatar b">G</div>
+        <div class="cname">Garou's MacBook</div>
+        <div class="chw">M3 Pro · 18 GB installed</div>
+        <div class="crole worker" id="rb">Worker</div>
+        <div class="contrib">
+          <div class="contrib-label"><span>Memory in use</span><span>3.1 / 8.0 GB offered</span></div>
+          <div class="contrib-bar"><div class="contrib-fill" id="fb" style="width:38%"></div></div>
+        </div>
+        <div class="layers-mini" id="lb"></div>
+      </div>
+      <div class="card offline" id="cc">
+        <div class="cstatus off"><div class="dot"></div>Not sharing</div>
+        <div class="avatar c">?</div>
+        <div class="cname">Windows Laptop</div>
+        <div class="chw">Ryzen AI 9 · 24 GB installed</div>
+        <div class="crole off">Offline</div>
+        <div class="contrib">
+          <div class="contrib-label"><span>Not connected</span><span>8.0 GB offered when online</span></div>
+          <div class="contrib-bar"><div class="contrib-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dist-section">
+    <div class="dist-title">How the model is split across your laptops</div>
+    <div class="dist-bar-track">
+      <div class="dseg dseg-a" id="da" style="width:62.5%">Yassine · 20 layers</div>
+      <div class="dseg dseg-b" id="db" style="width:37.5%">Garou · 12 layers</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:10px">32 layers total · tensor split 1:1 · coordinator holds the full model file</div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-card"><div class="ic-label">Graph submissions</div><div class="ic-val" id="gv">3,683</div><div class="ic-sub">Not token counts</div></div>
+    <div class="info-card"><div class="ic-label">Context window</div><div class="ic-val">2,048</div><div class="ic-sub">tokens</div></div>
+    <div class="info-card"><div class="ic-label">Model size</div><div class="ic-val">5.35 GB</div><div class="ic-sub">Q4_K_M quantised</div></div>
+    <div class="info-card"><div class="ic-label">Combined offer</div><div class="ic-val">16 GB</div><div class="ic-sub">8 GB × 2 peers</div></div>
+  </div>
+
+  <div class="prompt-section">
+    <div class="phead"><span class="phead-title">Try the extraction prompt</span><span style="font-size:11px;color:var(--muted)">SAMPLE DATA</span></div>
+    <div class="pbody">"Our production Db2 cluster keeps throwing ORA-12154 on every connection attempt after the last patch. Completely blocking our warehouse ETL pipeline."</div>
+    <div class="rbody" id="resp">{"issue_type": "connection_error", "severity": "critical", "product": "Db2", "error_code": "ORA-12154", "affected_component": "ETL pipeline"}</div>
+    <div class="pactions">
+      <button class="btn p" onclick="runIt()">Run on shared model</button>
+      <button class="btn s" onclick="document.getElementById('resp').textContent=''">Clear</button>
+      <span class="sharing-note">Processed across 2 laptops</span>
+    </div>
+  </div>
+</div>
+
+<script>
+function bl(id,n,tot,cls){var e=document.getElementById(id);if(!e)return;e.innerHTML='';for(var i=0;i<tot;i++){var b=document.createElement('div');b.className='lm'+(i<n?' '+cls:'');e.appendChild(b);}}
+bl('la',20,32,'on');bl('lb',12,32,'on');
+
+function ss(state,btn){
+  document.querySelectorAll('.stab').forEach(function(t){t.classList.remove('on')});btn.classList.add('on');
+  var ca=document.getElementById('ca'),cb=document.getElementById('cb');
+  var sa=document.getElementById('sa'),sb=document.getElementById('sb');
+  var ra=document.getElementById('ra'),rb=document.getElementById('rb');
+  var da=document.getElementById('da'),db=document.getElementById('db');
+  var fa=document.getElementById('fa'),fb=document.getElementById('fb');
+  if(state==='active'){
+    ca.className='card active';cb.className='card active';
+    sa.className='cstatus ok';sa.innerHTML='<div class="dot"></div>Sharing';
+    sb.className='cstatus ok';sb.innerHTML='<div class="dot"></div>Sharing';
+    ra.textContent='Coordinating';ra.className='crole coord';
+    rb.textContent='Worker';rb.className='crole worker';
+    fa.className='contrib-fill';fa.style.width='52%';
+    fb.className='contrib-fill';fb.style.width='38%';
+    bl('la',20,32,'on');bl('lb',12,32,'on');
+    da.style.width='62.5%';da.textContent='Yassine · 20 layers';db.style.width='37.5%';db.textContent='Garou · 12 layers';
+  } else if(state==='loading'){
+    ca.className='card loading';cb.className='card loading';
+    sa.className='cstatus busy';sa.innerHTML='<div class="dot"></div>Loading…';
+    sb.className='cstatus busy';sb.innerHTML='<div class="dot"></div>Loading…';
+    ra.textContent='Loading model';ra.className='crole coord';
+    rb.textContent='Connecting';rb.className='crole worker';
+    fa.className='contrib-fill loading-bar';
+    fb.className='contrib-fill loading-bar';
+    bl('la',0,32,'');bl('lb',0,32,'');
+    da.style.width='50%';da.textContent='…';db.style.width='50%';db.textContent='…';
+  } else if(state==='lost'){
+    ca.className='card active';cb.className='card offline';
+    sa.className='cstatus ok';sa.innerHTML='<div class="dot"></div>Sharing';
+    sb.className='cstatus off';sb.innerHTML='<div class="dot"></div>Stopped';
+    ra.textContent='Coordinating';ra.className='crole coord';
+    rb.textContent='Offline';rb.className='crole off';
+    fa.className='contrib-fill';fa.style.width='100%';
+    fb.className='contrib-fill';fb.style.width='0%';
+    bl('la',32,32,'on');bl('lb',0,32,'');
+    da.style.width='100%';da.textContent='Yassine · all 32 layers';db.style.width='0%';db.textContent='';
+  } else {
+    ca.className='card active';cb.className='card active';
+    sa.className='cstatus ok';sa.innerHTML='<div class="dot"></div>Done';
+    sb.className='cstatus ok';sb.innerHTML='<div class="dot"></div>Done';
+    ra.textContent='Completed';ra.className='crole coord';
+    rb.textContent='Completed';rb.className='crole worker';
+    fa.className='contrib-fill';fa.style.width='52%';
+    fb.className='contrib-fill';fb.style.width='38%';
+    bl('la',20,32,'on');bl('lb',12,32,'on');
+  }
+}
+
+var resps=['{"issue_type": "connection_error", "severity": "critical", "product": "Db2", "error_code": "ORA-12154", "affected_component": "ETL pipeline"}','{"issue_type": "performance", "severity": "high", "product": "CICS", "error_code": null, "affected_component": "transaction throughput"}','{"issue_type": "disk_full", "severity": "medium", "product": "z/OS", "error_code": "IEC030I", "affected_component": "JES spool"}'];
+var ri=0;
+function runIt(){
+  var full=resps[ri++%resps.length];var i=0;
+  document.getElementById('resp').textContent='▌';
+  var iv=setInterval(function(){document.getElementById('resp').textContent=full.slice(0,i)+'▌';i+=4;if(i>=full.length){clearInterval(iv);document.getElementById('resp').textContent=full;}},25);
+  var base=parseInt(document.getElementById('gv').textContent.replace(',',''));
+  var t=setInterval(function(){base+=Math.floor(Math.random()*15)+5;document.getElementById('gv').textContent=base.toLocaleString();},70);
+  setTimeout(function(){clearInterval(t);},1400);
+}
+</script>
+</body>
+</html>
