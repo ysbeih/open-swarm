@@ -4,8 +4,8 @@ Read `PROJECT_CONTEXT.md` before making project decisions. Continue the implemen
 
 - Build real distributed inference on the two available Macs first, then add the third laptop. The watsonx.ai reference run is deferred by the user.
 - One IBM Granite model must execute across physical peers. Separate replicas, hosted API answers, simulated telemetry, or fake ready states do not meet the objective.
-- Stack: Codex for development, native pinned llama.cpp RPC, Python/FastAPI peer agent, React dashboard.
-- Development setup: Codex runs on the user's M4 Mac; IBM Bob will handle setup and validation on the user's M3 Mac. Read `SECOND_SETUP.md` for the second laptop's setup. The brother's computer is the Windows peer.
+- Stack: native pinned llama.cpp RPC, Python/FastAPI peer agent, React dashboard.
+- Development setup: development and integration run on the user's M4 Mac; setup and validation on the user's M3 Mac follow `SECOND_SETUP.md`. The brother's computer is the Windows peer.
 - Product: share spare compute when using the app. No credits, wallets, currency, permanent tracker, or generic chatbot pivot.
 - Build for one person; finished beats fancy; the demo is in person.
 - Show actual native layer placement and measured activity. Clearly label RSS limitations and graph submission counts. Never invent benchmarks or claim an untested memory fit.
