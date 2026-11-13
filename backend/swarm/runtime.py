@@ -135,14 +135,46 @@ def worker_command(settings):
     return command
 
 
-def inference_command(settings):
-    remote = [p.endpoint for p in settings.peers if p.id != settings.peer_id]
+def session_route(settings, members=None):
+    """Filter the discovered device order without changing the saved configuration.
+
+    Each configured RPC worker exposes one selected backend. RPC indices are
+    assigned in --rpc endpoint order, so omitting a host renumbers later hosts.
+    """
+    members = members if members is not None else [p.id for p in settings.peers]
+    roster = [p.id for p in settings.peers]
+    if (len(members) not in (2, 3) or settings.peer_id not in members
+            or members != [pid for pid in roster if pid in members]):
+        raise RuntimeError("Select two or three known peers in roster order, including this laptop")
     if len(settings.devices) != len(settings.peers) or len(settings.tensor_split) != len(settings.devices):
         raise RuntimeError("Configure one measured runtime device and a positive split for each peer")
+    all_remote = [p for p in settings.peers if p.id != settings.peer_id]
+    remote = [p for p in all_remote if p.id in members]
+    owners = {f"RPC{i}": p.id for i, p in enumerate(all_remote)}
+    renamed = {p.id: f"RPC{i}" for i, p in enumerate(remote)}
+    devices, split, local_count = [], [], 0
+    for device, ratio in zip(settings.devices, settings.tensor_split):
+        if device in owners:
+            if owners[device] in renamed:
+                devices.append(renamed[owners[device]])
+                split.append(ratio)
+        elif device.startswith("RPC"):
+            raise RuntimeError("RPC device does not map to one configured worker; rerun device discovery")
+        else:
+            local_count += 1
+            devices.append(device)
+            split.append(ratio)
+    if local_count != 1 or len(devices) != len(members) or len(set(devices)) != len(members):
+        raise RuntimeError("Every selected peer must map to exactly one discovered device")
+    return [p.endpoint for p in remote], devices, split
+
+
+def inference_command(settings, members=None):
+    remote, devices, split = session_route(settings, members)
     return [str(settings.binary("llama-server")), "--model", str(settings.model),
             "--host", "127.0.0.1", "--port", str(settings.inference_port),
-            "--rpc", ",".join(remote), "--device", ",".join(settings.devices),
-            "--tensor-split", ",".join(map(str, settings.tensor_split)),
+            "--rpc", ",".join(remote), "--device", ",".join(devices),
+            "--tensor-split", ",".join(map(str, split)),
             "--split-mode", "layer", "--n-gpu-layers", "all", "--fit", "off",
             "--load-mode", "none", "--lazy-mode", "off", "--ctx-size", "2048",
             "--parallel", "1", "--batch-size", "128", "--ubatch-size", "64",

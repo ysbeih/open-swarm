@@ -15,7 +15,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from .config import RUNTIME_REVISION, Settings
-from .runtime import NativeRuntime, inference_command, worker_command
+from .runtime import NativeRuntime, inference_command, session_route, worker_command
 
 
 class Manifest(BaseModel):
@@ -100,6 +100,7 @@ class PeerService:
         return {
             "id": self.settings.peer_id, "name": self.settings.name,
             "state": self.state, "sharing": self.sharing, "online": True,
+            "supports_subset_sessions": True,
             "offer_bytes": self.settings.offer_bytes,
             "session": self.manifest.model_dump() if self.manifest else None,
             "error": self.error, "busy": self.busy, "runtime": self.runtime.snapshot(),
@@ -131,7 +132,8 @@ class PeerService:
                 return {"id": peer.id, "name": peer.name, "online": False, "state": "offline", "error": str(exc)}
         if not self.settings.peers:
             return [self.snapshot()]
-        return list(await asyncio.gather(*(read(p) for p in self.settings.peers)))
+        members = self.manifest.members if self.manifest else [p.id for p in self.settings.peers]
+        return list(await asyncio.gather(*(read(p) for p in self.settings.peers if p.id in members)))
 
     async def share(self, enabled):
         if enabled:
@@ -155,9 +157,10 @@ class PeerService:
         async with self.lock:
             if not self.sharing or self.unclean:
                 raise HTTPException(409, "Owner has not enabled sharing, or reset is required")
-            if manifest.members != [p.id for p in self.settings.peers]:
-                raise HTTPException(409, "Peer rosters differ; use the same ordered roster on all laptops")
-            if len(manifest.members) not in (2, 3) or manifest.coordinator not in manifest.members:
+            if manifest.members != [p.id for p in self.settings.peers if p.id in manifest.members]:
+                raise HTTPException(409, "Selected peers must be known and in the same roster order on every laptop")
+            if (len(manifest.members) not in (2, 3) or manifest.coordinator not in manifest.members
+                    or self.settings.peer_id not in manifest.members):
                 raise HTTPException(400, "This demo requires two or three members and a member coordinator")
             if manifest.runtime_revision != RUNTIME_REVISION or manifest.context != 2048:
                 raise HTTPException(409, "Runtime or context configuration mismatch")
@@ -214,7 +217,7 @@ class PeerService:
                 await asyncio.sleep(0.1)
         raise RuntimeError("RPC worker did not open its configured port")
 
-    async def begin(self):
+    async def begin(self, members=None):
         if self.start_task and not self.start_task.done():
             raise HTTPException(409, "Session start already in progress")
         if self.manifest or self.state == "failed":
@@ -224,10 +227,15 @@ class PeerService:
         issues = self.setup_issues()
         if issues:
             raise HTTPException(409, " ".join(issues))
-        self.start_task = asyncio.create_task(self._start())
+        members = list(members) if members is not None else [p.id for p in self.settings.peers]
+        try:
+            session_route(self.settings, members)
+        except RuntimeError as exc:
+            raise HTTPException(400, str(exc))
+        self.start_task = asyncio.create_task(self._start(members))
         return {"status": "starting"}
 
-    async def _start(self):
+    async def _start(self, members):
         manifest = None
         try:
             self.event("Verifying model SHA-256 before loading.")
@@ -235,20 +243,24 @@ class PeerService:
             if self.settings.model_sha256 and digest != self.settings.model_sha256:
                 raise RuntimeError("Downloaded model does not match the configured SHA-256")
             manifest = Manifest(id=uuid.uuid4().hex, coordinator=self.settings.peer_id,
-                                members=[p.id for p in self.settings.peers],
+                                members=members,
                                 model_name=self.settings.model_name, model_sha256=digest)
             await self.prepare(manifest)
             for peer in self.settings.peers:
-                if peer.id != self.settings.peer_id:
+                if peer.id != self.settings.peer_id and peer.id in members:
+                    if len(members) < len(self.settings.peers):
+                        state = await self.call(peer, "GET", "/api/peer")
+                        if not state.get("supports_subset_sessions"):
+                            raise RuntimeError(f"Update and restart {peer.name}'s app to select session participants")
                     await self.call(peer, "POST", "/api/sessions/prepare", json=manifest.model_dump())
             for peer in self.settings.peers:
-                if peer.id != self.settings.peer_id:
+                if peer.id != self.settings.peer_id and peer.id in members:
                     await self.call(peer, "POST", "/api/sessions/commit", json=manifest.model_dump(), timeout=15)
             await self.commit(manifest)
             async with self.lock:
                 if self.manifest != manifest or not self.sharing:
                     raise RuntimeError("Session was stopped before model loading")
-                await self.runtime.start(inference_command(self.settings), "coordinator", manifest.id)
+                await self.runtime.start(inference_command(self.settings, members), "coordinator", manifest.id)
                 self.persist()
             self.event("All peers acknowledged. Loading model across the configured devices.")
             deadline = time.monotonic() + self.settings.model_load_timeout_seconds
@@ -260,7 +272,7 @@ class PeerService:
                     if response.status_code == 200:
                         # Never mark all peers as contributors merely because they are connected.
                         placements = self.runtime.placement.values()
-                        missing = [device for device in self.settings.devices if device not in placements]
+                        missing = [device for device in session_route(self.settings, members)[1] if device not in placements]
                         if missing:
                             raise RuntimeError("No native layer assignment observed for: " + ", ".join(missing))
                         async with self.lock:
@@ -307,7 +319,7 @@ class PeerService:
                 return await self.call(peer, "POST", f"/api/sessions/{manifest.id}/stop", timeout=15)
             except (httpx.HTTPError, RuntimeError):
                 self.event(f"Could not confirm stop on {peer.name}. Reset that laptop before retrying.", "error")
-        await asyncio.gather(*(stop(peer) for peer in self.settings.peers))
+        await asyncio.gather(*(stop(peer) for peer in self.settings.peers if peer.id in manifest.members))
 
     async def stop_all(self):
         if self.start_task and not self.start_task.done() and self.start_task != asyncio.current_task():

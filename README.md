@@ -79,7 +79,15 @@ For a fresh setup only, `scripts/configure.py` also accepts `--model 30b --quant
 .venv/bin/python scripts/check_demo.py --json
 ```
 
-Exit codes: 0 READY, 1 BUSY, 2 BLOCKED, 3 UNKNOWN. The checker validates every configured member, matching session manifests, native runtime roles and observed layer placement. Worker-only laptops do not need coordinator weights or coordinator device settings. A failed direct refresh cannot reuse an earlier READY snapshot. This is a point-in-time readiness check; it neither starts inference nor proves a request will complete. A physical request and its recorded output remain the demo evidence.
+Exit codes: 0 READY, 1 BUSY, 2 BLOCKED, 3 UNKNOWN. The checker validates every selected session member, matching session manifests, native runtime roles and observed layer placement. Before a session, it checks the saved roster. Worker-only laptops do not need coordinator weights or coordinator device settings. A failed direct refresh cannot reuse an earlier READY snapshot. This is a point-in-time readiness check; it neither starts inference nor proves a request will complete. A physical request and its recorded output remain the demo evidence.
+
+### Choose two or three session participants
+
+The saved roster can retain all three laptops. Before starting, choose participants under **Your swarm → Laptops for this session**. Select both Macs to run without Windows, or all three when Windows is available. Each selected owner must enable sharing. Participant selection does not rewrite `config/local.json`, rotate credentials or change the saved memory offers.
+
+The authenticated `POST /api/session/start` also accepts `{"members":["a","b"]}`. Omitting the body preserves the original behavior of selecting the whole saved roster. Selected IDs must be a known, ordered group of two or three peers including the initiating laptop. Membership is fixed for a session; stop it before adding Windows. Every selected worker must have this code update to accept a subset of its saved roster. An older worker produces an update-required error; it is never silently excluded.
+
+Native RPC endpoints, device indices and split ratios are derived for the selected participants from the existing discovered configuration. The runtime still checks actual native layer placement before reporting ready. During a session, health checks, the dashboard, the readiness checker and stop requests follow its selected membership; an excluded offline peer cannot invalidate that session. The prototype continues to require one exposed native backend per RPC worker.
 
 ## Run the demo
 

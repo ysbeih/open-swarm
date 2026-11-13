@@ -460,6 +460,22 @@ def test_wrong_peer_identity_cannot_be_ready(monkeypatch, capsys):
     assert 'identity' in capsys.readouterr().out
 
 
+def test_selected_two_peer_session_ignores_unselected_configured_peer(monkeypatch, capsys):
+    state = make_state()
+    state['expected_peers'] = 2
+    settings = stub_run(monkeypatch, state, snapshot=state['peers'][1])
+    settings.peers.append(SimpleNamespace(id='c', name='Windows', url='http://c.test'))
+    calls = []
+    def fetch(url, token):
+        calls.append(url)
+        assert url == 'http://b.test'
+        return state['peers'][1], None
+    monkeypatch.setattr(check_demo, '_fetch_peer', fetch)
+    assert check_demo.run(as_json=True) == EXIT_READY
+    assert json.loads(capsys.readouterr().out)['status'] == STATUS_READY
+    assert calls == ['http://b.test']
+
+
 @pytest.mark.parametrize('as_json', [True, False])
 def test_real_output_path_redacts_credentials(monkeypatch, capsys, as_json):
     settings = stub_run(monkeypatch, make_state(), error='timeout')

@@ -32,6 +32,7 @@ function App() {
   const [storageError, setStorageError] = useState(''), [copied, setCopied] = useState('');
   const [details, setDetails] = useState(false);
   const [guestOpen, setGuestOpen] = useState(false);
+  const [selectedPeers, setSelectedPeers] = useState(null);
   const abortRef = useRef(null), tokenRef = useRef('');
   const conversationRef = useRef(null), followBottom = useRef(true);
   const chat = chats.find(c => c.id === activeId) || chats[0];
@@ -119,6 +120,9 @@ function App() {
   const coordinator = peers.find(p => p.session?.coordinator === p.id && p.session?.id === local?.session?.id);
   const ready = coordinator?.state === 'ready' && !coordinator?.busy && !connectionError;
   const targetPeers = data?.expected_peers || 2;
+  const sessionPeers = local?.session?.members || selectedPeers || peers.map(peer => peer.id);
+  const selectedMembers = peers.filter(peer => sessionPeers.includes(peer.id)).map(peer => peer.id);
+  const selectedPeersReady = peers.filter(peer => selectedMembers.includes(peer.id)).every(peer => peer.online && peer.sharing);
   const contributions = peers.map(peer => ({ peer, contribution: peerContribution(peer, coordinator, !connectionError) }));
   const online = contributions.filter(({ contribution }) => contribution.online).length;
   const sharingEnabled = contributions.filter(({ contribution }) => contribution.sharingEnabled).length;
@@ -222,7 +226,7 @@ function App() {
       </section>}
       {view === 'swarm' && <><div className="page-heading"><div className="eyebrow">SHARED INFERENCE NETWORK</div><h1>Your swarm</h1><p>Live measurements from the computers running your model.</p></div>
       <section className="overview" aria-label="Swarm overview">
-        <div><span className="metric-label">ONLINE LAPTOPS</span><strong>{connectionError ? '—' : online}<small> / {targetPeers}</small></strong><span className="metric-note">{connectionError ? 'Waiting for fresh status' : online === targetPeers ? 'All configured peer apps reachable' : 'Waiting for your other laptops'}</span></div>
+        <div><span className="metric-label">ONLINE LAPTOPS</span><strong>{connectionError ? '—' : online}<small> / {targetPeers}</small></strong><span className="metric-note">{connectionError ? 'Waiting for fresh status' : online === targetPeers ? (local?.session ? 'All session peers reachable' : 'All configured peer apps reachable') : 'Waiting for your other laptops'}</span></div>
         <div><span className="metric-label">SHARING MODEL MEMORY</span><strong>{connectionError ? '—' : memoryContributors}<small> / {targetPeers}</small></strong><span className="metric-note">{connectionError ? 'Contribution status unavailable' : `${sharingEnabled} sharing enabled · ${(offered / 1e9).toFixed(1)} GB combined limit`}</span></div>
         <div><span className="metric-label">SHARED MODEL</span><strong className="model-metric">{local?.session?.model_name || data?.model?.name || 'Granite'}</strong><span className="metric-note">{ready ? 'Ready for a new request' : names[coordinator?.state || local?.state] || 'Connecting to local agent'}</span></div>
       </section>
@@ -245,7 +249,12 @@ function App() {
       <div className="contribution"><div><Power size={18}/><div><b>Your contribution</b><span>Up to 8 GB · advisory target with a sampled stop guard</span></div></div><button className={'button ' + (local?.sharing ? 'secondary' : 'primary')} disabled={!local || !!pending || !!connectionError} onClick={() => action('/sharing',{enabled:!local.sharing})}>{local?.sharing ? 'Stop sharing' : 'Share this laptop'}<ArrowUpRight size={16}/></button></div>
       <section className="session-area">
         <aside className="session-panel"><div className="section-title"><h2>Session</h2><span className={'status-dot '+(ready?'lit':'')}/></div><div className="session-value">{names[coordinator?.state || local?.state] || 'Connecting…'}</div><p>{local?.session ? `Coordinated by ${coordinator?.name || local.session.coordinator}. Requests can originate from any peer.` : 'All participating owners enable sharing. One peer coordinates this session.'}</p>
-          <button className="button primary full" disabled={!local?.sharing || !!local?.session || !!pending || issues.length > 0 || !!connectionError} onClick={()=>action('/session/start')}><Play size={14}/>Start shared session</button>
+          <fieldset className="session-members" disabled={!!local?.session || !!pending}>
+            <legend>Laptops for this session</legend>
+            {peers.map(peer => <label key={peer.id}><input type="checkbox" checked={sessionPeers.includes(peer.id)} disabled={peer.id === local?.id} onChange={event => setSelectedPeers(event.target.checked ? [...sessionPeers, peer.id] : sessionPeers.filter(id => id !== peer.id))}/><span>{peer.name}{peer.id === local?.id ? ' (this laptop)' : ''}</span><small>{peer.online ? peer.sharing ? 'Sharing enabled' : 'Not sharing' : 'Offline'}</small></label>)}
+          </fieldset>
+          <p className="session-members-note">Choose two or three online laptops with sharing enabled. Changing participants requires a new session; saved peer settings stay unchanged.</p>
+          <button className="button primary full" disabled={!local?.sharing || !!local?.session || !!pending || issues.length > 0 || !!connectionError || !selectedPeersReady || selectedMembers.length < 2 || selectedMembers.length > 3} onClick={()=>action('/session/start', {members: selectedMembers})}><Play size={14}/>Start shared session</button>
           <div className="session-buttons"><button className="button secondary" disabled={!local?.session || !!pending} onClick={()=>action('/session/stop')}><Square size={13}/>Stop session</button><button className="button secondary" disabled={!local || !!pending} onClick={()=>action('/reset')}><RotateCcw size={13}/>Reset</button></div>
           {issues.length > 0 && <div className="setup"><b>Before your first run</b>{issues.map((issue,i)=><p key={issue}><span>{String(i+1).padStart(2,'0')}</span>{issue}</p>)}</div>}
           <div className="session-details"><span>Context window <b>2,048 tokens</b></span><span>Generation limit <b>256 tokens</b></span><span>Model on this laptop <b>{data?.model?.present?'Downloaded':'Not downloaded'}</b></span><span>Artifact size <b>{gb(data?.model?.file_bytes)}</b></span></div>

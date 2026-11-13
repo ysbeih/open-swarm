@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from swarm.app import create_app
 from swarm.config import Peer, Settings
 from swarm.peer import Generation, Manifest, PeerService
-from swarm.runtime import NativeRuntime, inference_command
+from swarm.runtime import NativeRuntime, inference_command, session_route
 
 
 class FakeRuntime:
@@ -80,6 +80,108 @@ def health_test_peer(settings, manifest):
         return snapshots
     peer.peers_snapshot = read
     return peer, snapshots
+
+
+@pytest.mark.parametrize('members,endpoints,devices,ratios', [
+    (['a', 'b'], ['127.0.0.2:50052'], ['MTL0', 'RPC0'], [8, 2]),
+    (['a', 'c'], ['127.0.0.3:50052'], ['MTL0', 'RPC0'], [8, 1]),
+    (['a', 'b', 'c'], ['127.0.0.2:50052', '127.0.0.3:50052'], ['MTL0', 'RPC1', 'RPC0'], [8, 1, 2]),
+])
+def test_session_device_selection_preserves_owner_mapping(settings, members, endpoints, devices, ratios):
+    settings.devices = ['MTL0', 'RPC1', 'RPC0']
+    settings.tensor_split = [8, 1, 2]
+    before = settings.model_dump()
+    assert session_route(settings, members) == (endpoints, devices, ratios)
+    argv = inference_command(settings, members)
+    assert argv[argv.index('--rpc') + 1] == ','.join(endpoints)
+    assert argv[argv.index('--device') + 1] == ','.join(devices)
+    assert settings.model_dump() == before
+
+
+def test_session_device_selection_rejects_duplicate_worker_devices(settings):
+    settings.devices = ['MTL0', 'RPC0', 'RPC0']
+    settings.tensor_split = [1, 1, 1]
+    with pytest.raises(RuntimeError, match='exactly one discovered device'):
+        session_route(settings, ['a', 'b'])
+
+
+async def test_worker_accepts_selected_members_without_changing_saved_roster(settings, manifest):
+    settings.peer_id = 'b'
+    peer = PeerService(settings, FakeRuntime())
+    before = settings.model_dump()
+    try:
+        await peer.share(True)
+        await peer.prepare(manifest.model_copy(update={'members': ['a', 'b']}))
+        assert peer.manifest.members == ['a', 'b']
+        assert settings.model_dump() == before
+        await peer.stop_local(manifest.id)
+    finally:
+        await peer.client.aclose()
+
+
+@pytest.mark.parametrize('members', [['a'], ['a', 'z'], ['a', 'b', 'b'], ['b', 'c'], ['a', 'c', 'b']])
+async def test_invalid_session_selection_never_starts_a_task(settings, members):
+    peer = PeerService(settings, FakeRuntime())
+    try:
+        peer.sharing = True
+        with pytest.raises(HTTPException):
+            await peer.begin(members)
+        assert peer.start_task is None and peer.manifest is None
+    finally:
+        await peer.client.aclose()
+
+
+async def test_selected_two_peer_api_lifecycle_never_contacts_excluded_peer(settings):
+    """In-process lifecycle test only; physical execution is verified separately."""
+    runtime = FakeRuntime()
+    runtime.placement = {0: 'Metal', 1: 'RPC0'}
+    coordinator = PeerService(settings, runtime)
+    worker_settings = settings.model_copy(update={'peer_id': 'b', 'state_dir': str(settings.state_path / 'b')})
+    worker = PeerService(worker_settings, FakeRuntime())
+    coordinator.sharing = worker.sharing = True
+    async def worker_ready():
+        pass
+    worker.wait_worker = worker_ready
+    calls = []
+    async def handler(request):
+        calls.append(str(request.url))
+        assert request.url.host != '127.0.0.3', 'Excluded Windows peer was contacted'
+        if request.url.port == 8081:
+            return httpx.Response(200, json={'status': 'ok'})
+        if request.method == 'GET':
+            return httpx.Response(200, json=worker.snapshot())
+        if request.url.path.endswith('/prepare'):
+            data = await worker.prepare(Manifest.model_validate_json(request.content))
+        elif request.url.path.endswith('/commit'):
+            data = await worker.commit(Manifest.model_validate_json(request.content))
+        else:
+            data = await worker.stop_local(request.url.path.split('/')[-2])
+        return httpx.Response(200, json=data)
+    await coordinator.client.aclose()
+    coordinator.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    before = settings.model_dump()
+    try:
+        app = create_app(settings, coordinator)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test',
+                                    headers={'Authorization': 'Bearer ' + settings.token}) as client:
+            response = await client.post('/api/session/start', json={'members': ['a', 'b']})
+            assert response.status_code == 202
+            await coordinator.start_task
+            assert coordinator.state == 'ready'
+            response = await client.get('/api/state')
+            state = response.json()
+            assert state['expected_peers'] == 2
+            assert [p['id'] for p in state['peers']] == ['a', 'b']
+            await coordinator.check_required_peers()
+            assert coordinator.state == 'ready'
+            assert (await client.post('/api/session/stop')).status_code == 200
+        assert coordinator.manifest is None and worker.manifest is None
+        assert not runtime.running and not worker.runtime.running
+        assert settings.model_dump() == before
+        assert any('/prepare' in url for url in calls)
+    finally:
+        await coordinator.client.aclose()
+        await worker.client.aclose()
 
 
 async def test_transient_health_miss_preserves_native_inference(settings, manifest):

@@ -4,12 +4,13 @@ import asyncio
 import hmac
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
+from typing import List, Optional
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .config import ROOT, load_settings
 from .peer import Generation, Manifest, PeerService
@@ -27,6 +28,10 @@ Do not invent order IDs.
 
 class Sharing(BaseModel):
     enabled: bool
+
+
+class SessionStart(BaseModel):
+    members: Optional[List[str]] = Field(default=None, min_length=2, max_length=3)
 
 
 def create_app(settings=None, service=None):
@@ -66,7 +71,7 @@ def create_app(settings=None, service=None):
     @app.get("/api/state", dependencies=auth)
     async def state():
         return {"local": service.snapshot(), "peers": await service.peers_snapshot(),
-                "expected_peers": len(settings.peers) if settings.peers else 2,
+                "expected_peers": len(service.manifest.members) if service.manifest else (len(settings.peers) if settings.peers else 2),
                 "model": {"name": settings.model_name,
                           "file_bytes": settings.model.stat().st_size if settings.model.is_file() else None,
                           "present": settings.model.is_file()},
@@ -78,8 +83,8 @@ def create_app(settings=None, service=None):
         return await service.share(body.enabled)
 
     @app.post("/api/session/start", dependencies=auth, status_code=202)
-    async def start():
-        return await service.begin()
+    async def start(body: Optional[SessionStart] = None):
+        return await service.begin(body.members if body else None)
 
     @app.post("/api/session/stop", dependencies=auth)
     async def stop():

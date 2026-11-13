@@ -106,7 +106,7 @@ def analyse(state: Dict, remote_snapshots: List[Dict]) -> Tuple[str, List[str], 
         if (len(members) not in (2, 3) or len(set(members)) != len(members)
                 or local["id"] not in members or session["coordinator"] not in members):
             return _unknown("Invalid session membership.")
-        if set(members) != set(by_id):
+        if not set(members).issubset(by_id):
             return _unknown("Required session members are missing or the peer roster differs.")
     else:
         members = list(by_id)
@@ -255,8 +255,12 @@ def run(as_json: bool = False) -> int:
             status, blockers, detail = _unknown("Local API identity does not match this configuration.")
         else:
             snapshots = []
+            session = state['local'].get('session')
+            members = session.get('members') if isinstance(session, dict) else None
+            configured = [p.id for p in settings.peers]
+            selected = members if isinstance(members, list) else configured
             for peer in settings.peers:
-                if peer.id == settings.peer_id:
+                if peer.id == settings.peer_id or peer.id not in selected:
                     continue
                 snapshot, error = _fetch_peer(peer.url, settings.token)
                 if snapshot is None or snapshot.get("id") != peer.id:
@@ -264,10 +268,11 @@ def run(as_json: bool = False) -> int:
                                 "error": error or "Peer identity does not match roster"}
                 snapshots.append(snapshot)
             # The configured roster is authoritative, including on older API versions.
-            state = {**state, "expected_peers": len(settings.peers)}
+            state = {**state, "expected_peers": len(selected)}
             status, blockers, detail = analyse(state, snapshots)
             actual = {p.get("id") for p in detail["peers"]}
-            if status in (STATUS_READY, STATUS_BUSY) and actual != {p.id for p in settings.peers}:
+            if status in (STATUS_READY, STATUS_BUSY) and (actual != set(selected)
+                    or selected != [pid for pid in configured if pid in selected]):
                 status, blockers, detail = _unknown("API membership does not match the configured roster.")
     detail = _redact(detail, (settings.token,) if settings else ())
     print(json.dumps(detail, indent=2) if as_json else format_report(status, detail["blockers"], detail))
