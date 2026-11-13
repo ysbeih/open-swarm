@@ -55,7 +55,7 @@ def setup_gateway(tmp_path, *, complete=True, max_jobs=2):
 async def test_guest_access_does_not_expose_controls_or_private_state(tmp_path):
     gateway, client, release, calls, state = setup_gateway(tmp_path)
     try:
-        for method, path in (("GET", "/api/bootstrap"), ("GET", "/api/peer"), ("GET", "/api/state"),
+        for method, path in (("GET", "/api/guest-invite"), ("GET", "/api/bootstrap"), ("GET", "/api/peer"), ("GET", "/api/state"),
                              ("POST", "/api/session/start"), ("POST", "/api/sharing"),
                              ("GET", "/openapi.json"), ("GET", "/config/local.json")):
             assert (await client.request(method, path)).status_code == 404

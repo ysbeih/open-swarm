@@ -2,7 +2,7 @@
 
 Run one IBM Granite model across laptops that contribute spare memory and compute. Each laptop runs the same peer app; one temporarily coordinates a session. A React dashboard shows live peer status, observed process memory, native layer assignments and RPC graph submissions.
 
-**Status:** physical two-Mac inference completed with Granite 4.2 8B Q4_K_M on November 13, 2026, using Metal on the M4 and an RPC Metal worker on the M3. The first completed request used 120 input tokens and 69 output tokens in 11.354 seconds after model loading. This is one measured run, not a benchmark. Memory fit within the owners' full budgets, three-host 30B execution and physical failure recovery remain unverified. The 8B run validates distribution, not that 8B needs multiple machines.
+**Status:** physical three-laptop inference completed with Granite 4.2 8B Q4_K_M on November 13, 2026: Metal on M4 and M3, plus a Windows CPU worker. A roughly equal split assigned 14 native stages to M4, 14 to Windows and 13 to M3, including the output stage. The three-case sample passed in 16.233 seconds after loading, with 120 input tokens and 69 output tokens. This is one measured run, not a general benchmark. Equal partitioning does not imply equal utilization or speed. Memory fit within the owners' full budgets, 30B execution and physical failure recovery remain unverified. The 8B run validates distribution, not that 8B needs multiple machines.
 
 ## First setup on each Mac
 
@@ -84,7 +84,7 @@ The dashboard also displays the coordinator's latest completed answer after a pa
 
 ## What this prototype proves
 
-- A single selected 8B model executed across two physical Macs, with native placement and RPC activity recorded.
+- A single selected 8B model executed across two physical Macs and a Windows laptop, with roughly equal native placement and actual RPC activity recorded.
 - Participants explicitly enable and withdraw their contribution.
 - Any configured peer can submit to the active session. A different coordinator requires a cold reload and its own model file/device configuration.
 - There is no permanent tracker, hosted answer service, credit ledger or automatic failover.
@@ -136,6 +136,14 @@ Tunnel **only port 8002**. Do not tunnel port 8000, port 8081 or native RPC. The
 .venv/bin/python scripts/guest_link.py --url https://YOUR-HOSTNAME.trycloudflare.com
 ```
 
+To show this invite using the laptop dashboard's **Guest mode** button, run this on the guest host in another terminal:
+
+```bash
+.venv/bin/python scripts/guest_invite.py
+```
+
+This read-only helper listens on **127.0.0.1:8003** and requires the existing dashboard bearer token. It accepts only local dashboard origins, checks the existing pass against the localhost guest gateway, and generates a matching QR in memory. It does not create or renew passes, start tunnels, or restart inference. **Never tunnel port 8003.** Keep it running while using the dashboard's invite panel; it can be stopped independently of inference. Missing, expired, rejected, or exhausted passes are shown without a shareable QR. Gateway readiness does not prove that the external tunnel is reachable.
+
 Share `.state/guest-url.txt` or `.state/guest-qr.png` only with intended guests. The URL fragment contains the limited guest pass; it is distinct from the private control token. The page stores it for that browser tab and removes it from the address bar. A bare tunnel URL can display the page but cannot submit jobs or retrieve results without the pass. Stopping the guest gateway revokes its pass; stopping the tunnel removes external reachability. Neither requires stopping the model session.
 
 The phone polls for partial output because [Cloudflare Quick Tunnels do not support SSE](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). These temporary tunnels have no uptime guarantee. The underlying guest gateway consumes the existing native stream and marks interrupted output incomplete.
@@ -145,3 +153,12 @@ The phone polls for partial output because [Cloudflare Quick Tunnels do not supp
 - [Pinned llama.cpp runtime](https://github.com/ggml-org/llama.cpp/tree/5676dfbe01e7ebe0387913680eee0ed39bf4a363)
 - [IBM Granite 4.2 8B GGUF](https://huggingface.co/ibm-granite/granite-4.2-8b-GGUF)
 - [IBM Granite 4.2 30B GGUF](https://huggingface.co/ibm-granite/granite-4.2-30b-GGUF)
+
+
+### Chat history on each device
+
+The laptop dashboard stores its conversations in that device's browser storage. Guest chats stay in the guest's browser tab. There is no shared chat list: neither page imports the coordinator's latest answer, and opening the same guest invite on another device does not load the first device's conversations. Existing auto-imported coordinator answers are excluded from the new dashboard history; locally submitted messages and drafts are retained. The legacy browser-storage entry is left intact as a backup.
+
+Within the same browser, dashboard tabs merge messages by ID and preserve drafts. A live stream remains attached to its originating tab; reloading it may leave a clearly labeled partial response. Keep the submitting tab open until completion. New chat reuses an unused empty conversation. Recent complete turns from the selected chat are sent as bounded context, with the built-in sample sent independently for reproducible checks.
+
+This is local conversation history, not an isolation boundary for the trusted demo operators: prompts still run through the session coordinator, and existing host-side demo records and native logs remain. Refresh the page after building updated assets; a frontend build does not require restarting the model or peer agent.

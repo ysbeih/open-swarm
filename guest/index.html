@@ -1,11 +1,21 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Open Swarm · Guest pass</title><link rel="stylesheet" href="/guest.css"><script src="/guest.js" defer></script></head>
-<body><main>
-  <header><a href="/" aria-label="Open Swarm home">open<span>swarm</span></a><span class="badge">GUEST PASS</span></header>
-  <section class="intro"><p class="eyebrow">SHARED CAPACITY. REAL INFERENCE.</p><h1>Your prompt.<br><span>Our laptops.</span></h1><p>Try one Granite model running across the computers your host is sharing.</p></section>
-  <section class="pool" aria-label="Swarm status"><div class="status-line"><span class="dot"></span><strong id="status">Connecting…</strong></div><p id="model">Checking the shared model</p><div id="peers"></div></section>
-  <div id="error" role="alert" hidden></div>
-  <section class="work"><label for="prompt">What would you like to test?</label><textarea id="prompt" maxlength="2000" rows="6" placeholder="Enter a short, non-sensitive test prompt"></textarea><div class="prompt-tools"><button id="sample" class="text-button" type="button" disabled>Try the sample</button><span id="count">0 / 2,000</span></div><button id="run" class="primary" type="button" disabled>Run on shared laptops <span aria-hidden="true">↗</span></button>
-  <div class="result-heading"><h2>Model output</h2><span id="result-status" class="badge">AWAITING A RUN</span></div><pre id="output" aria-live="polite">Your answer will appear here.</pre><div id="metrics" hidden></div><button id="copy" class="text-button" type="button" hidden>Copy answer</button></section>
-  <footer><p>Your phone submits the request. The laptops run the model.</p><p>Requests pass through a temporary web relay. Demo inputs and outputs are saved on the host. Use non-sensitive text.</p><span id="allowance"></span></footer>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Open Swarm · Guest chat</title><link rel="stylesheet" href="/guest.css"><script src="/guest.js" defer></script></head>
+<body>
+<button id="scrim" aria-label="Close navigation" hidden></button>
+<aside id="sidebar" aria-label="Chat navigation">
+  <a class="brand" href="/" aria-label="Open Swarm home">open<span>swarm</span><small>COMPUTE, TOGETHER.</small></a>
+  <button id="new-chat" class="new-chat">＋ <span>New chat</span></button>
+  <nav><button id="chat-tab" class="nav active">◌ <span>Chat</span></button><button id="models-tab" class="nav">▤ <span>Models</span></button></nav>
+  <p class="sidebar-label">YOUR CHATS</p><div id="chat-list"></div>
+  <p class="history-note">Chats stay on this device, in this tab.<br>Your phone submits. Laptops compute.</p><div class="guest-identity"><span>G</span><div>Guest access<small>Temporary shared pass</small></div></div>
+</aside>
+<main>
+  <header><div><button id="menu" aria-label="Toggle navigation" aria-expanded="false">☰</button><button id="model-picker"><span id="model">Checking model…</span><span aria-hidden="true">⌄</span></button></div><span class="badge">GUEST</span></header>
+  <div id="error" role="alert" hidden></div><div id="storage-error" role="status" hidden></div>
+  <section id="chat-view" aria-label="Chat">
+    <div id="conversation"><section id="welcome"><div class="welcome-symbol" aria-hidden="true">✳</div><p class="eyebrow">SHARED CAPACITY. REAL INFERENCE.</p><h1>What shall we try?</h1><p>One Granite model.<br>The host’s laptops, working together.</p><button id="welcome-sample" class="suggestion" disabled><strong>Extract structured data <span>↗</span></strong><small>Try the three-case JSON check</small></button></section><div id="messages" aria-live="polite"></div></div>
+    <div class="composer-wrap"><div class="composer"><label class="sr-only" for="prompt">Message the shared model</label><textarea id="prompt" maxlength="2000" rows="2" placeholder="Message the shared model…"></textarea><div class="prompt-tools"><button id="sample" class="text-button" type="button" disabled>Try sample ↗</button><span id="count">0 / 2,000</span><button id="run" aria-label="Send message" disabled>↑</button></div></div><p id="context-note" class="context-note"></p><p class="reply-note">Replies up to 128 tokens · One request at a time</p></div>
+  </section>
+  <section id="models-view" hidden><p class="eyebrow">RUN ON SHARED CAPACITY</p><h1>Your models</h1><p>The host’s active session sets the model for every chat.</p><article class="model-card"><span class="badge">CURRENT SESSION MODEL</span><h2 id="model-title">Checking model…</h2><p>IBM Granite · native llama.cpp RPC</p><div class="pool"><div class="status-line"><span class="dot"></span><strong id="status">Connecting…</strong></div><div id="peers"></div></div><div class="model-facts"><span>Context<b>2,048 tokens</b></span><span>Guest reply limit<b>128 tokens</b></span></div><button id="back-to-chat" class="primary">Back to chat ↗</button></article><article class="model-card unavailable"><span class="badge">UNVERIFIED · UNAVAILABLE</span><h2>Granite 4.2 30B</h2><p>Planned for a future three-laptop test. Execution and memory fit have not been verified.</p><button class="unavailable-button" disabled>Not available in this session</button></article><p class="model-note">Only the host can configure a different model. This page keeps the current model unchanged.</p></section>
+  <footer><span id="connection-status">Connecting to host…</span><span id="allowance"></span><details><summary>About guest access</summary><p>Your phone submits requests; it does not contribute compute. Requests pass through a temporary web relay. Demo inputs and outputs are saved on the host. Use non-sensitive text.</p></details></footer>
 </main></body></html>
