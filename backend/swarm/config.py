@@ -52,6 +52,7 @@ class Settings(BaseModel):
     worker_device: str = ""
     devices: List[str] = Field(default_factory=list)
     tensor_split: List[float] = Field(default_factory=lambda: [1, 1, 1])
+    model_load_timeout_seconds: int = Field(default=600, ge=60, le=1800)
     peers: List[Peer] = Field(default_factory=list)
     state_dir: str = ".state"
 

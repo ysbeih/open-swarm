@@ -13,6 +13,7 @@ def main():
     parser.add_argument("--b", required=True, help="M3 Pro's LAN IPv4 address")
     parser.add_argument("--c", help="Optional Windows laptop's LAN IPv4 address")
     parser.add_argument("--model", choices=["8b", "30b"], default="8b")
+    parser.add_argument("--quant", choices=["Q4_K_M", "Q3_K_M"], default="Q4_K_M")
     args = parser.parse_args()
     import ipaddress
     hosts = [args.a, args.b] + ([args.c] if args.c else [])
@@ -35,8 +36,8 @@ def main():
                   "api_port": 8000, "rpc_port": 50052, "inference_port": 8081,
                   "token": token, "offer_bytes": 8_000_000_000,
                   "runtime_bin": ".tools/llama.cpp/build/bin" + ("/Release" if i == 2 else ""),
-                  "model_path": f"models/granite-4.2-{args.model}-Q4_K_M.gguf",
-                  "model_name": f"Granite 4.2 {args.model.upper()} · Q4_K_M",
+                  "model_path": f"models/granite-4.2-{args.model}-{args.quant}.gguf",
+                  "model_name": f"Granite 4.2 {args.model.upper()} · {args.quant}",
                   "model_sha256": "", "worker_device": "CPU" if i == 2 else "MTL0",
                   "devices": [], "tensor_split": [1] * len(hosts), "peers": peers}
         path.write_text(json.dumps(config, indent=2))

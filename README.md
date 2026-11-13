@@ -60,6 +60,27 @@ Stop B's temporary discovery worker with **Ctrl+C** before starting the app-mana
 
 The downloader fetches the official IBM GGUF at an immutable revision, verifies its SHA-256 and writes metadata beside it. The 8B Q4_K_M download is approximately 5.35 GB. Only the coordinator needs the complete model file on disk; remote RPC workers receive their tensors from it. This is not per-peer torrent downloading.
 
+### Larger-model experiment: 30B Q3_K_M
+
+The official IBM Granite 4.2 30B Q3_K_M artifact is 14,133,162,720 bytes. Its weights exceed any one owner's 8 GB contribution, while a three-peer equal layer split is estimated at roughly 4.73 GB on M4, 4.66 GB on Windows and 4.57 GB on M3, plus coordinator embeddings, attention cache and runtime buffers. This is an estimate from the actual GGUF header, not a verified memory fit. A laptop with more available RAM could run it alone.
+
+```bash
+.venv/bin/python scripts/download_model.py --size 30b --quant Q3_K_M
+```
+
+Pinned candidate: `ibm-granite/granite-4.2-30b-GGUF`, revision `27b350a791e81d9a4d1ddca1c49282e9ec533768`, SHA-256 `7aad53fe80a9751d543ee6799d205a0a4f5d07e8d7f186b8753bdad7a12dc312`. Keep the verified 8B file for rollback. The downloader does not activate the new model. After full verification, stop the current session and back up the coordinator's ignored configuration before changing `model_path`, `model_name`, and `model_sha256` to the new artifact and restarting that peer app. Preserve the roster, shared token, measured device order, 8 GB offers and equal split. Workers do not need the model file; a worker with a configured model hash must accept the new artifact before a session can start. An empty worker hash permits the trusted coordinator's manifest, as on the existing M3 setup.
+
+For a fresh setup only, `scripts/configure.py` also accepts `--model 30b --quant Q3_K_M`. Do not regenerate a working cluster's configuration or token. The dashboard distinguishes the configured model from a loaded session; a candidate card is not evidence of execution.
+
+### Read-only demo check
+
+```bash
+.venv/bin/python scripts/check_demo.py
+.venv/bin/python scripts/check_demo.py --json
+```
+
+Exit codes: 0 READY, 1 BUSY, 2 BLOCKED, 3 UNKNOWN. The checker validates every configured member, matching session manifests, native runtime roles and observed layer placement. Worker-only laptops do not need coordinator weights or coordinator device settings. A failed direct refresh cannot reuse an earlier READY snapshot. This is a point-in-time readiness check; it neither starts inference nor proves a request will complete. A physical request and its recorded output remain the demo evidence.
+
 ## Run the demo
 
 On **each** laptop:

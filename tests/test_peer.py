@@ -68,6 +68,93 @@ async def test_consent_required(settings, manifest):
     await peer.close()
 
 
+def health_test_peer(settings, manifest):
+    runtime = FakeRuntime()
+    runtime.running = True
+    peer = PeerService(settings, runtime)
+    peer.manifest, peer.state = manifest, 'computing'
+    snapshots = [{'id': key, 'name': key, 'online': True, 'sharing': True,
+                  'state': 'worker_ready', 'runtime': {'running': True},
+                  'session': manifest.model_dump()} for key in 'bc']
+    async def read():
+        return snapshots
+    peer.peers_snapshot = read
+    return peer, snapshots
+
+
+async def test_transient_health_miss_preserves_native_inference(settings, manifest):
+    peer, snapshots = health_test_peer(settings, manifest)
+    try:
+        snapshots[0]['online'] = False
+        await peer.check_required_peers()
+        await peer.check_required_peers()
+        assert peer.runtime.running and peer.runtime.stops == 0
+        assert peer.state == 'computing'
+        snapshots[0]['online'] = True
+        await peer.check_required_peers()
+        snapshots[0]['online'] = False
+        await peer.check_required_peers()
+        assert peer.runtime.running and peer.runtime.stops == 0
+    finally:
+        await peer.client.aclose()
+
+
+async def test_three_consecutive_health_misses_stop_native_inference(settings, manifest):
+    peer, snapshots = health_test_peer(settings, manifest)
+    try:
+        snapshots[0]['online'] = False
+        for _ in range(3):
+            await peer.check_required_peers()
+        assert not peer.runtime.running and peer.runtime.stops == 1
+        assert peer.state == 'failed'
+        assert 'b: unavailable for 3 consecutive' in peer.error
+    finally:
+        await peer.client.aclose()
+
+
+@pytest.mark.parametrize('change', [
+    {'sharing': False}, {'runtime': {'running': False}}, {'state': 'failed'},
+    {'session': None},
+])
+async def test_explicit_peer_failure_or_withdrawal_stops_immediately(settings, manifest, change):
+    peer, snapshots = health_test_peer(settings, manifest)
+    try:
+        snapshots[0].update(change)
+        await peer.check_required_peers()
+        assert not peer.runtime.running and peer.runtime.stops == 1
+        assert peer.state == 'failed' and 'b:' in peer.error
+    finally:
+        await peer.client.aclose()
+
+
+async def test_health_failure_counts_do_not_cross_sessions(settings, manifest):
+    peer, snapshots = health_test_peer(settings, manifest)
+    try:
+        snapshots[0]['online'] = False
+        await peer.check_required_peers()
+        await peer.check_required_peers()
+        peer.manifest = manifest.model_copy(update={'id': 'c' * 32})
+        snapshots[1]['session'] = peer.manifest.model_dump()
+        await peer.check_required_peers()
+        assert peer.runtime.running and peer.runtime.stops == 0
+    finally:
+        await peer.client.aclose()
+
+
+async def test_stale_health_result_cannot_stop_replacement_session(settings, manifest):
+    peer, snapshots = health_test_peer(settings, manifest)
+    try:
+        async def read():
+            peer.manifest = manifest.model_copy(update={'id': 'c' * 32})
+            snapshots[0]['state'] = 'failed'
+            return snapshots
+        peer.peers_snapshot = read
+        await peer.check_required_peers()
+        assert peer.runtime.running and peer.runtime.stops == 0
+    finally:
+        await peer.client.aclose()
+
+
 async def test_two_peer_manifest_and_native_route(settings, manifest):
     settings.peers = settings.peers[:2]
     settings.devices = ["Metal", "RPC0"]

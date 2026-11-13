@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QrCode, ArrowUp, MessageSquare, Plus, Menu, Copy, ArrowUpRight, Check, ChevronDown, Circle, Cpu, Layers3, Laptop, Network, Play, Power, RotateCcw, Square, Terminal, Wifi, X } from 'lucide-react';
+import { QrCode, ArrowUp, MessageSquare, Plus, Menu, Copy, ArrowUpRight, Check, ChevronDown, Circle, Cpu, MemoryStick, Layers3, Laptop, Network, Play, Power, RotateCcw, Square, Terminal, Wifi, X } from 'lucide-react';
 import './style.css';
 import GuestMode from './GuestMode.jsx';
 import { CHAT_KEY, chatTitle, conversationPrompt, newChat, readChats, loadDeviceChats, mergeChats } from './chat.js';
+import { peerContribution } from './peer-status.js';
 
 const gb = bytes => bytes == null ? '—' : `${(bytes / 1e9).toFixed(2)} GB`;
 const names = { off: 'Not sharing', offered: 'Available', reserved: 'Reserved', worker_ready: 'Worker ready', loading: 'Loading model', ready: 'Model ready', computing: 'Computing', failed: 'Needs attention', offline: 'Offline', stopping: 'Stopping' };
@@ -118,13 +119,18 @@ function App() {
   const coordinator = peers.find(p => p.session?.coordinator === p.id && p.session?.id === local?.session?.id);
   const ready = coordinator?.state === 'ready' && !coordinator?.busy && !connectionError;
   const targetPeers = data?.expected_peers || 2;
-  const online = peers.filter(p => p.online).length;
-  const offered = peers.filter(p => p.online && p.sharing).reduce((n,p) => n + p.offer_bytes, 0);
+  const contributions = peers.map(peer => ({ peer, contribution: peerContribution(peer, coordinator, !connectionError) }));
+  const online = contributions.filter(({ contribution }) => contribution.online).length;
+  const sharingEnabled = contributions.filter(({ contribution }) => contribution.sharingEnabled).length;
+  const memoryContributors = contributions.filter(({ contribution }) => contribution.memoryInUse).length;
+  const offered = contributions.filter(({ contribution }) => contribution.sharingEnabled).reduce((n,{ peer }) => n + peer.offer_bytes, 0);
   const issues = local?.setup_issues || [];
   const placements = coordinator?.runtime?.placement || {};
   const placementCount = Object.keys(placements).length;
 
   const modelName = local?.session?.model_name || data?.model?.name || 'Checking model…';
+  const largerModelSelected = /Granite 4\.2 30B/i.test(modelName);
+  const largestOffer = Math.max(0, ...peers.map(peer => peer.offer_bytes || 0));
   const context = conversationPrompt(chat.turns, prompt, 6000, data?.sample_prompt);
 
   async function run() {
@@ -197,27 +203,45 @@ function App() {
           <p className="composer-note">{running ? 'One request at a time. You can browse your other chats.' : !ready ? 'Waiting for the swarm to be ready.' : context.omitted ? 'Older turns omitted to fit the request limit. The sample runs independently.' : 'Recent complete turns included within the request limit.'} <span>Shift + Enter for a new line · 256-token replies</span></p>
         </div>
       </section>}
-      {view === 'models' && <section className="models-view"><div className="page-heading"><div className="eyebrow">RUN ON SHARED CAPACITY</div><h1>Your models</h1><p>The active session determines the model for every chat.</p></div><article className="model-card current"><div className="model-card-top"><span className="device-icon"><Layers3 size={25}/></span><span className="pill green">Current session model</span></div><h2>{modelName}</h2><p>IBM Granite · native llama.cpp RPC</p><div className="model-facts"><span>Status<b>{names[coordinator?.state || local?.state] || 'Connecting…'}</b></span><span>Context<b>2,048 tokens</b></span><span>Artifact<b>{gb(data?.model?.file_bytes)}</b></span><span>Native assignments<b>{placementCount || '—'} observed</b></span></div><button className="button primary" onClick={()=>navigate('chat')}>Back to chat <ArrowUpRight size={15}/></button></article><article className="model-card unavailable"><div className="model-card-top"><Layers3 size={23}/><span className="pill">Unverified · unavailable</span></div><h2>Granite 4.2 30B</h2><p>Planned for a future three-laptop test. Execution and memory fit have not been verified.</p><button className="button secondary" disabled>Not available in this session</button></article><p className="model-explainer">Model switching requires a new native session. This demo keeps the loaded model warm; browsing models does not change it.</p></section>}
+      {view === 'models' && <section className="models-view">
+        <div className="page-heading"><div className="eyebrow">RUN ON SHARED CAPACITY</div><h1>Your models</h1><p>The active session determines the model for every chat.</p></div>
+        <article className="model-card current">
+          <div className="model-card-top"><span className="device-icon"><Layers3 size={25}/></span><span className={'pill '+(memoryContributors === targetPeers ? 'green' : '')}>{local?.session ? 'Session model' : 'Configured model'}</span></div>
+          <h2>{modelName}</h2><p>IBM Granite · native llama.cpp RPC</p>
+          <div className="model-facts"><span>Status<b>{names[coordinator?.state || local?.state] || 'Connecting…'}</b></span><span>Context<b>2,048 tokens</b></span><span>Local artifact<b>{gb(data?.model?.file_bytes)}</b></span><span>Native assignments<b>{placementCount || '—'} observed</b></span></div>
+          {largestOffer > 0 && data?.model?.file_bytes > largestOffer && <p>The {gb(data.model.file_bytes)} artifact exceeds the largest individual contribution limit of {gb(largestOffer)}. Runtime and cache memory are additional.</p>}
+          <button className="button primary" onClick={()=>navigate('chat')}>Back to chat <ArrowUpRight size={15}/></button>
+        </article>
+        <article className="model-card unavailable">
+          <div className="model-card-top"><Layers3 size={23}/><span className="pill">{largerModelSelected ? 'Fallback model' : 'Candidate · fit unverified'}</span></div>
+          <h2>{largerModelSelected ? 'Granite 4.2 8B · Q4_K_M' : 'Granite 4.2 30B · Q3_K_M'}</h2>
+          <p>{largerModelSelected ? 'The 5.35 GB integration model previously ran across all three laptops. Switching back requires a new session.' : 'Official IBM artifact: 14.13 GB. Its weights exceed one 8 GB contribution; three-laptop execution and total memory use still need validation.'}</p>
+          <button className="button secondary" disabled>Requires a new session</button>
+        </article>
+        <p className="model-explainer">Model switching requires a new native session. Browsing models does not change the running model.</p>
+      </section>}
       {view === 'swarm' && <><div className="page-heading"><div className="eyebrow">SHARED INFERENCE NETWORK</div><h1>Your swarm</h1><p>Live measurements from the computers running your model.</p></div>
       <section className="overview" aria-label="Swarm overview">
-        <div><span className="metric-label">CONNECTED PEERS</span><strong>{online}<small> / {targetPeers}</small></strong><span className="metric-note">{online === targetPeers ? 'All configured peers reachable' : 'Waiting for your other laptops'}</span></div>
-        <div><span className="metric-label">OFFERED MEMORY</span><strong>{(offered / 1e9).toFixed(1)}<small> GB</small></strong><span className="metric-note">Shared budgets, including runtime overhead</span></div>
+        <div><span className="metric-label">ONLINE LAPTOPS</span><strong>{connectionError ? '—' : online}<small> / {targetPeers}</small></strong><span className="metric-note">{connectionError ? 'Waiting for fresh status' : online === targetPeers ? 'All configured peer apps reachable' : 'Waiting for your other laptops'}</span></div>
+        <div><span className="metric-label">SHARING MODEL MEMORY</span><strong>{connectionError ? '—' : memoryContributors}<small> / {targetPeers}</small></strong><span className="metric-note">{connectionError ? 'Contribution status unavailable' : `${sharingEnabled} sharing enabled · ${(offered / 1e9).toFixed(1)} GB combined limit`}</span></div>
         <div><span className="metric-label">SHARED MODEL</span><strong className="model-metric">{local?.session?.model_name || data?.model?.name || 'Granite'}</strong><span className="metric-note">{ready ? 'Ready for a new request' : names[coordinator?.state || local?.state] || 'Connecting to local agent'}</span></div>
       </section>
       <div className="section-title"><h2>Your compute pool <span>{peers.length} known</span></h2><span className="subtle"><Wifi size={14}/> Manual membership · local network</span></div>
+      <div className="contribution-legend" aria-label="Contribution status guide"><span><i className="legend-dot online"/><b>Online</b> App reachable</span><span><i className="legend-dot available"/><b>Sharing enabled</b> Available to contribute</span><span><i className="legend-dot loaded"/><b>Memory in use</b> Model loaded</span></div>
       <section className="peers" style={{'--peer-count':targetPeers}} aria-label="Peer contributions">
-        {peers.map(peer => <article className={'peer-card ' + (peer.id === local?.id ? 'self' : '')} key={peer.id}>
-          <div className="peer-top"><div className="device-icon"><Laptop size={22}/></div><span className={'pill ' + (peer.online && peer.sharing ? 'green' : '')}><span className="status-dot"/>{names[peer.state] || peer.state}</span></div>
+        {contributions.map(({ peer, contribution }) => <article className={`peer-card contribution-${contribution.tone} ${peer.id === local?.id ? 'self' : ''}`} key={peer.id}>
+          <div className="peer-top"><div className="device-icon"><Laptop size={22}/></div><span className={'pill peer-connection ' + (contribution.online ? 'connected' : '')}><span className="status-dot"/>{connectionError ? 'Status unknown' : contribution.online ? 'Online' : 'Offline'}</span></div>
           <h3>{peer.name}{peer.id === local?.id && <span>You</span>}</h3>
-          <p className="role">{peer.session?.coordinator === peer.id ? 'Session coordinator + contributor' : peer.runtime?.role === 'worker' ? 'RPC compute contributor' : 'No active model assignment'}</p>
-          <div className="memory-label"><span>Observed process memory</span><b>{gb(peer.runtime?.rss_bytes)}</b></div>
-          <div className="memory-track"><span style={{width: Math.min(100, (peer.runtime?.rss_bytes || 0) / (peer.offer_bytes || 8e9) * 100) + '%'}}/></div>
-          <div className="peer-stats"><span>Offer <b>{peer.sharing ? gb(peer.offer_bytes) : 'Off'}</b></span><span>Peak <b>{gb(peer.runtime?.peak_rss_bytes)}</b></span></div>
-          <div className="peer-footer"><Cpu size={13}/><span>CPU {peer.runtime?.cpu_percent == null ? '—' : peer.runtime.cpu_percent + '%'}</span><span>RPC graph submissions <b>{peer.runtime?.graph_submissions ?? '—'}</b></span></div>
+          <p className="role">{peer.session?.coordinator === peer.id ? 'Session coordinator' : peer.runtime?.role === 'worker' ? 'RPC worker' : 'Peer app'}</p>
+          <div className="memory-contribution"><div><MemoryStick size={17}/><strong>{contribution.label}</strong></div><p>{contribution.detail}</p></div>
+          <div className="memory-label"><span>Process memory (RSS)</span><b>{contribution.online ? gb(peer.runtime?.rss_bytes) : '—'}</b></div>
+          <div className="memory-track"><span style={{width: Math.min(100, (contribution.online ? peer.runtime?.rss_bytes || 0 : 0) / (peer.offer_bytes || 8e9) * 100) + '%'}}/></div>
+          <div className="peer-stats"><span>Share limit <b>{!contribution.online ? '—' : peer.sharing ? gb(peer.offer_bytes) : 'Off'}</b></span><span>{peer.runtime?.running ? 'Peak' : 'Last peak'} <b>{contribution.online ? gb(peer.runtime?.peak_rss_bytes) : '—'}</b></span></div>
+          <div className="peer-footer"><Cpu size={13}/><span>CPU {!contribution.online || peer.runtime?.cpu_percent == null ? '—' : peer.runtime.cpu_percent + '%'}</span><span>RPC graph submissions <b>{contribution.online && peer.runtime?.running ? peer.runtime?.graph_submissions ?? '—' : '—'}</b></span></div>
         </article>)}
         {Array.from({length: Math.max(0, targetPeers - peers.length)}, (_,i) => <article className="peer-card empty" key={'empty'+i}><div className="empty-icon"><Laptop size={28}/></div><h3>Add a laptop</h3><p>Start the peer app on another laptop<br/>with the same peer roster.</p><span>Not configured</span></article>)}
       </section>
-      <p className="measurement-note">Process RSS is incomplete GPU / unified-memory accounting. RPC graph submissions are not tokens or completed kernels.</p>
+      <p className="measurement-note">Loaded model weights stay in memory between requests. RSS includes the peer app and runtime, and is incomplete GPU / unified-memory accounting; it is not an exact measure of shared model memory. Sharing limits are offered budgets. RPC graph submissions are not tokens or completed kernels.</p>
       <div className="contribution"><div><Power size={18}/><div><b>Your contribution</b><span>Up to 8 GB · advisory target with a sampled stop guard</span></div></div><button className={'button ' + (local?.sharing ? 'secondary' : 'primary')} disabled={!local || !!pending || !!connectionError} onClick={() => action('/sharing',{enabled:!local.sharing})}>{local?.sharing ? 'Stop sharing' : 'Share this laptop'}<ArrowUpRight size={16}/></button></div>
       <section className="session-area">
         <aside className="session-panel"><div className="section-title"><h2>Session</h2><span className={'status-dot '+(ready?'lit':'')}/></div><div className="session-value">{names[coordinator?.state || local?.state] || 'Connecting…'}</div><p>{local?.session ? `Coordinated by ${coordinator?.name || local.session.coordinator}. Requests can originate from any peer.` : 'All participating owners enable sharing. One peer coordinates this session.'}</p>
