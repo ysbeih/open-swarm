@@ -1,8 +1,66 @@
 # Open Swarm
 
-Run one IBM Granite model across laptops that contribute spare memory and compute. Each laptop runs the same peer app; one temporarily coordinates a session. A React dashboard shows live peer status, observed process memory, native layer assignments and RPC graph submissions.
+**Share compute. Use models. Together.**
 
-**Status:** physical three-laptop inference completed with Granite 4.2 8B Q4_K_M on November 13, 2026: Metal on M4 and M3, plus a Windows CPU worker. A roughly equal split assigned 14 native stages to M4, 14 to Windows and 13 to M3, including the output stage. The three-case sample passed in 16.233 seconds after loading, with 120 input tokens and 69 output tokens. This is one measured run, not a general benchmark. Equal partitioning does not imply equal utilization or speed. Memory fit within the owners' full budgets, 30B execution and physical failure recovery remain unverified. The 8B run validates distribution, not that 8B needs multiple machines.
+You want to try an open AI model, but your laptop cannot spare enough memory to run it. The people around you have laptops too. What if you could pool that capacity?
+
+Open Swarm is built around a simple idea: **share some of your computer's resources, and use the capacity others share with you.** Connect your laptops, pool the capacity you can spare, and use one AI model together. Each computer handles part of the work.
+
+The goal is to help developers, students and small teams experiment with models beyond what one person can comfortably run alone, using hardware they already own. Shared AI capacity, built by the people using it—including here in Michigan.
+
+## Share capacity, then put it to work
+
+1. **Share your laptop.** Open the peer app and enable sharing. Every owner decides whether to contribute.
+2. **Run one model together.** Choose the laptops taking part. They work together to run the same model.
+3. **Use the shared model.** Send a prompt and get an answer powered by the group.
+
+## See it in action
+
+### 1. Share compute
+
+![Three laptops contributing to the Open Swarm session, captured from the Windows peer](snapshots/Screenshot%202026-11-13%20181101.png)
+
+See who is contributing and how much capacity they are offering. Each owner can enable or stop sharing. The 24 GB shown is the group's combined offer, not measured model memory use.
+
+### 2. Use the shared model
+
+![Open Swarm chat ready to send a prompt to the shared Granite model](snapshots/Screenshot%202026-11-13%20181157.png)
+
+Once the session is loaded, use the model from a participating laptop. The chat is the interface to the shared compute pool.
+
+### 3. Get a completed answer
+
+![Recorded structured-data response in the laptop interface, with three passing checks and measured token usage](snapshots/model-response.jpg)
+
+Put the model to work—for example, turning support messages into structured data. This replay shows a completed three-laptop request with all three sample checks passing.
+
+### 4. See where the work ran
+
+![Recorded native layer placement across M4, Windows and M3, with measured request usage](snapshots/native-execution.jpg)
+
+See how the model's work is divided across the laptops and what a request used. This graphic comes from the same recorded run as the response above.
+
+<a id="temporary-phone-access"></a>
+
+### 5. Optional extra: invite someone on a phone
+
+![Guest mode with a sample QR and an explanation of temporary phone access](snapshots/guest-mode.jpg)
+
+Want someone else to try the shared model? Share a temporary QR or link. They can send a prompt from cellular or another Wi-Fi network while the laptops do the work. The phone does not need to join the hotspot and does not contribute compute.
+
+*The QR in this documentation image opens the repository. Live guest passes are not published here.*
+
+[Snapshot gallery and capture notes →](snapshots/README.md)
+
+## What the prototype proves
+
+The current prototype connects two or three trusted laptops on one local network. A broader cooperative network is the vision; internet compute membership and automatic discovery remain future work.
+
+One **IBM Granite 4.2 8B Q4_K_M** model executed across a Mac M4 Pro, a Mac M3 Pro and a Windows Ryzen laptop at Michigan DevFest + AI Hackathon. The Macs used Metal; Windows used CPU. Native logs recorded 14 assignments on M4, 14 on Windows and 13 on M3, including the output stage. All three structured-data checks passed in the recorded request above: 120 input tokens, 69 output tokens and 22.651 seconds total. Equal layer placement does not imply equal execution time.
+
+The 8B demo proves real distributed execution. It does not prove that 8B requires multiple machines. Testing a larger artifact that exceeds one owner's 8 GB contribution is the next step; **30B execution and memory fit remain unverified**. We have not demonstrated lower cost, higher speed or lower energy use than local or hosted alternatives. Request timings are individual observations, not general benchmarks.
+
+**Built with:** IBM Granite · pinned native llama.cpp RPC · Python / FastAPI · React. Each session has a temporary coordinator, with no permanent central tracker. The native RPC data path runs through that coordinator. Process RSS is incomplete GPU/unified-memory accounting; graph submissions are not tokens or completed kernels.
 
 ## First setup on each Mac
 
@@ -109,7 +167,7 @@ Launch the app from a normal Terminal if a coding agent's restricted shell canno
 
 If macOS asks about incoming connections, allow the project processes on the trusted demo network. Do not disable the firewall. API port: 8000; native RPC port: 50052; coordinator inference: localhost 8081. Network isolation on event Wi-Fi can prevent peer access.
 
-The dashboard also displays the coordinator's latest completed answer after a page refresh or an API-initiated run, marked as a saved answer. A new dashboard request streams live. Saved answers do not re-run the prompt currently in the editor, and their original checks are not reconstructed without the original prompt.
+The dashboard keeps conversations in the submitting device's browser. A new request streams in its originating tab; another laptop does not import that conversation. Refreshing during generation can leave a clearly labeled partial response. The built-in sample checks only run for the exact sample prompt.
 
 ## What this prototype proves
 
@@ -140,7 +198,25 @@ To record a request against an already active session, run `.venv/bin/python scr
 
 The separate IBM watsonx.ai reference run and provided IBM Cloud account usage remain deferred until the core distributed demo works.
 
-## Temporary phone access
+## Sources
+
+- [Pinned llama.cpp runtime](https://github.com/ggml-org/llama.cpp/tree/5676dfbe01e7ebe0387913680eee0ed39bf4a363)
+- [IBM Granite 4.2 8B GGUF](https://huggingface.co/ibm-granite/granite-4.2-8b-GGUF)
+- [IBM Granite 4.2 30B GGUF](https://huggingface.co/ibm-granite/granite-4.2-30b-GGUF)
+
+
+### Chat history on each device
+
+The laptop dashboard stores its conversations in that device's browser storage. Guest chats stay in the guest's browser tab. There is no shared chat list: neither page imports the coordinator's latest answer, and opening the same guest invite on another device does not load the first device's conversations. Existing auto-imported coordinator answers are excluded from the new dashboard history; locally submitted messages and drafts are retained. The legacy browser-storage entry is left intact as a backup.
+
+Within the same browser, dashboard tabs merge messages by ID and preserve drafts. A live stream remains attached to its originating tab; reloading it may leave a clearly labeled partial response. Keep the submitting tab open until completion. New chat reuses an unused empty conversation. Recent complete turns from the selected chat are sent as bounded context, with the built-in sample sent independently for reproducible checks.
+
+This is local conversation history, not an isolation boundary for the trusted demo operators: prompts still run through the session coordinator, and existing host-side demo records and native logs remain. Refresh the page after building updated assets; a frontend build does not require restarting the model or peer agent.
+
+## Guest access setup
+
+<details>
+<summary>Set up temporary phone access</summary>
 
 The optional guest gateway lets a phone submit a test without joining the laptops' LAN. The model still executes on the private compute peers. This is guest access to inference, not internet membership in the compute pool.
 
@@ -177,17 +253,5 @@ Share `.state/guest-url.txt` or `.state/guest-qr.png` only with intended guests.
 
 The phone polls for partial output because [Cloudflare Quick Tunnels do not support SSE](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). These temporary tunnels have no uptime guarantee. The underlying guest gateway consumes the existing native stream and marks interrupted output incomplete.
 
-## Sources
 
-- [Pinned llama.cpp runtime](https://github.com/ggml-org/llama.cpp/tree/5676dfbe01e7ebe0387913680eee0ed39bf4a363)
-- [IBM Granite 4.2 8B GGUF](https://huggingface.co/ibm-granite/granite-4.2-8b-GGUF)
-- [IBM Granite 4.2 30B GGUF](https://huggingface.co/ibm-granite/granite-4.2-30b-GGUF)
-
-
-### Chat history on each device
-
-The laptop dashboard stores its conversations in that device's browser storage. Guest chats stay in the guest's browser tab. There is no shared chat list: neither page imports the coordinator's latest answer, and opening the same guest invite on another device does not load the first device's conversations. Existing auto-imported coordinator answers are excluded from the new dashboard history; locally submitted messages and drafts are retained. The legacy browser-storage entry is left intact as a backup.
-
-Within the same browser, dashboard tabs merge messages by ID and preserve drafts. A live stream remains attached to its originating tab; reloading it may leave a clearly labeled partial response. Keep the submitting tab open until completion. New chat reuses an unused empty conversation. Recent complete turns from the selected chat are sent as bounded context, with the built-in sample sent independently for reproducible checks.
-
-This is local conversation history, not an isolation boundary for the trusted demo operators: prompts still run through the session coordinator, and existing host-side demo records and native logs remain. Refresh the page after building updated assets; a frontend build does not require restarting the model or peer agent.
+</details>
